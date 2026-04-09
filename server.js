@@ -170,6 +170,11 @@ app.get('/api/reports', async (req, res) => {
   res.json(data);
 });
 
+// ── 後台頁面 ──────────────────────────────────────────────
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
 // ── 後台 API ──────────────────────────────────────────────
 app.get('/admin/api/reports', requireAdmin, async (req, res) => {
   const { tab } = req.query; // pending | approved | rejected
