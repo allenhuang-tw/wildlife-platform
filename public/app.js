@@ -644,11 +644,32 @@ async function openDetailModal(id) {
   if (currentUser && currentUser.id === r.user_id) {
     footer.style.display = '';
     editBtn.onclick = () => openEditModal(r);
+    document.getElementById('delete-report-btn').onclick = () => deleteReport(r.id, r.species);
   } else {
     footer.style.display = 'none';
   }
 
   document.getElementById('detail-modal').classList.remove('hidden');
+}
+
+// ── 刪除通報 ──────────────────────────────────────────────
+async function deleteReport(id, species) {
+  if (!confirm(`確定要刪除「${species}」這筆通報嗎？\n此動作無法復原。`)) return;
+
+  const btn = document.getElementById('delete-report-btn');
+  btn.textContent = '刪除中…'; btn.disabled = true;
+
+  try {
+    const res  = await fetch(`/api/reports/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '刪除失敗');
+    document.getElementById('detail-modal').classList.add('hidden');
+    showToast('通報已刪除', 'success');
+    await loadReports();
+  } catch (err) {
+    showToast(err.message, 'error');
+    btn.textContent = '🗑️ 刪除'; btn.disabled = false;
+  }
 }
 
 // ── Login prompt ──────────────────────────────────────────

@@ -307,8 +307,22 @@ header {
   border-top: 1px solid var(--border);
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   background: #fafdf9;
 }
+
+.btn-danger {
+  background: transparent;
+  border: 1px solid var(--dead);
+  color: var(--dead);
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.btn-danger:hover { background: var(--dead); color: #fff; }
 
 /* ── FORM SECTIONS ───────────────────────────── */
 .form-section {
