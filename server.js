@@ -180,9 +180,10 @@ app.post('/api/reports', requireAuth, upload.array('images', 5), async (req, res
       .upload(name, file.buffer, { contentType: file.mimetype, upsert: false });
     if (!upErr) {
       const { data: { publicUrl } } = supabase.storage.from('wildlife-images').getPublicUrl(name);
+      console.log('圖片上傳成功:', publicUrl);
       imagePaths.push(publicUrl);
     } else {
-      console.error('圖片上傳失敗:', upErr.message);
+      console.error('圖片上傳失敗:', upErr.message, '| bucket: wildlife-images | 請確認 bucket 存在且設為 public');
     }
   }
 

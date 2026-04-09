@@ -319,10 +319,13 @@ function setLocationFromCoords(lat, lng, map, setMarker, oldMarker) {
   setMarker(marker);
   selectedLat = lat;
   selectedLng = lng;
+  // 立即用座標當地址，避免送出時還殘留舊地址
+  selectedAddress = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  showLocationBadge('📡 解析中…');
 
   reverseGeocode(lat, lng).then(addr => {
-    selectedAddress = addr;
-    showLocationBadge(`${addr || `${lat.toFixed(5)}, ${lng.toFixed(5)}`}`);
+    if (addr) selectedAddress = addr;
+    showLocationBadge(selectedAddress);
   });
 }
 
@@ -505,9 +508,14 @@ async function openDetailModal(id) {
     ? `<img src="${r.user_avatar || ''}" onerror="this.style.display='none'" /><span>由 ${r.user_name} 通報</span>`
     : '<span>由匿名用戶通報（範例資料）</span>';
 
-  const imgs = (r.image_paths || []).length
-    ? `<div class="detail-images">${r.image_paths.map(p =>
-        `<img src="${p}" alt="" onclick="window.open('${p}')">`
+  // image_paths 有時從 Supabase 回來是 string，需要解析
+  let imagePaths = r.image_paths || [];
+  if (typeof imagePaths === 'string') {
+    try { imagePaths = JSON.parse(imagePaths); } catch { imagePaths = []; }
+  }
+  const imgs = imagePaths.length
+    ? `<div class="detail-images">${imagePaths.map(p =>
+        `<img src="${p}" alt="通報照片" loading="lazy" onclick="window.open('${p}')">`
       ).join('')}</div>`
     : '';
 
