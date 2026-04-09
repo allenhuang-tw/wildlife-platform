@@ -36,13 +36,31 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',   // 讓 LINE OAuth redirect 後 cookie 能帶回來
     maxAge: 7 * 24 * 60 * 60 * 1000
   }
 }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// 從 session 或 signed cookie 取得使用者（防止 Render 多 instance session 遺失）
+const COOKIE_NAME = 'ww_user';
+const COOKIE_OPTS = {
+  signed: true, httpOnly: true, sameSite: 'lax',
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+  secure: process.env.NODE_ENV === 'production',
+};
+
+function getUser(req) {
+  if (req.session.user) return req.session.user;
+  const raw = req.signedCookies[COOKIE_NAME];
+  if (raw) { try { return JSON.parse(raw); } catch {} }
+  return null;
+}
+
 const requireAuth = (req, res, next) => {
-  if (!req.session.user) return res.status(401).json({ error: '請先登入' });
+  const user = getUser(req);
+  if (!user) return res.status(401).json({ error: '請先登入' });
+  req.session.user = user;   // 補回 session
   next();
 };
 
@@ -105,7 +123,9 @@ app.get('/auth/line/callback', async (req, res) => {
 
     if (upsertErr) throw upsertErr;
 
-    req.session.user = { id: user.id, name: displayName, avatar: pictureUrl || '', lineId: userId };
+    const userData = { id: user.id, name: displayName, avatar: pictureUrl || '', lineId: userId };
+    req.session.user = userData;
+    res.cookie(COOKIE_NAME, JSON.stringify(userData), COOKIE_OPTS);
     res.redirect('/');
   } catch (err) {
     console.error('LINE auth error:', err.response?.data || err.message);
@@ -113,10 +133,16 @@ app.get('/auth/line/callback', async (req, res) => {
   }
 });
 
-app.get('/auth/user', (req, res) => res.json({ user: req.session.user || null }));
+app.get('/auth/user', (req, res) => {
+  const user = getUser(req);
+  if (user) req.session.user = user;  // 補回 session
+  res.json({ user: user || null });
+});
 
 app.post('/auth/logout', (req, res) => {
-  req.session.destroy(() => res.json({ success: true }));
+  req.session.destroy(() => {});
+  res.clearCookie(COOKIE_NAME);
+  res.json({ success: true });
 });
 
 // ── 通報 API ──────────────────────────────────────────────
