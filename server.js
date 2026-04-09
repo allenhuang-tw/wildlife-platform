@@ -205,6 +205,51 @@ app.post('/api/reports', requireAuth, upload.array('images', 5), async (req, res
   res.json({ success: true, id: data.id });
 });
 
+app.put('/api/reports/:id', requireAuth, upload.array('images', 5), async (req, res) => {
+  const currentUser = getUser(req);
+  const { data: report, error: fetchErr } = await supabase
+    .from('reports').select('user_id, image_paths').eq('id', req.params.id).single();
+  if (fetchErr || !report) return res.status(404).json({ error: '通報不存在' });
+  if (report.user_id !== currentUser.id) return res.status(403).json({ error: '無權限' });
+
+  const { species, quantity, status, lat, lng, address, description, keep_images } = req.body;
+  if (!species || !lat || !lng) return res.status(400).json({ error: '物種名稱與地點為必填' });
+
+  // 保留使用者選擇保留的舊圖
+  let keptImages = [];
+  try { keptImages = JSON.parse(keep_images || '[]'); } catch {}
+
+  // 上傳新圖片
+  const newImagePaths = [];
+  for (const file of (req.files || [])) {
+    const ext  = path.extname(file.originalname).toLowerCase() || '.jpg';
+    const name = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from('wildlife-images')
+      .upload(name, file.buffer, { contentType: file.mimetype });
+    if (!upErr) {
+      const { data: { publicUrl } } = supabase.storage.from('wildlife-images').getPublicUrl(name);
+      newImagePaths.push(publicUrl);
+    } else {
+      console.error('圖片上傳失敗:', upErr.message);
+    }
+  }
+
+  const { data, error } = await supabase.from('reports').update({
+    species:     species.trim(),
+    quantity:    parseInt(quantity) || 1,
+    status:      status || 'alive',
+    lat:         parseFloat(lat),
+    lng:         parseFloat(lng),
+    address:     address || '',
+    description: description || '',
+    image_paths: [...keptImages, ...newImagePaths],
+  }).eq('id', req.params.id).select().single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, id: data.id });
+});
+
 app.delete('/api/reports/:id', requireAuth, async (req, res) => {
   const { data: report } = await supabase
     .from('reports').select('user_id').eq('id', req.params.id).single();

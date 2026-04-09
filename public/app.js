@@ -44,6 +44,8 @@ let miniMapMarker = null;
 let addrMapMarker = null;
 let gpsMapMarker  = null;
 let miniMapReady = false;
+let editingReportId = null;   // null = 新增模式, 數字 = 編輯模式
+let keepImages = [];          // 編輯時要保留的舊圖 URL
 
 // ── 啟動 ────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -247,6 +249,8 @@ function bindEvents() {
 // ── 通報 Modal ────────────────────────────────────────────
 function openReportModal() {
   resetReportForm();
+  document.querySelector('#report-modal .modal-header h2').textContent = '新增野生動物通報';
+  document.getElementById('submit-btn').textContent = '📤 提交通報';
   document.getElementById('report-modal').classList.remove('hidden');
 
   // Init mini-map after modal is visible
@@ -264,6 +268,84 @@ function openReportModal() {
 
 function closeReportModal() {
   document.getElementById('report-modal').classList.add('hidden');
+  editingReportId = null;
+  keepImages = [];
+}
+
+function openEditModal(report) {
+  resetReportForm();
+  editingReportId = report.id;
+
+  // 預填欄位
+  document.getElementById('species-input').value = report.species || '';
+  document.getElementById('qty-input').value      = report.quantity || 1;
+  document.getElementById('desc-input').value     = report.description || '';
+
+  // 狀態按鈕
+  document.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active'));
+  const statusBtn = document.querySelector(`.status-btn[data-status="${report.status}"]`);
+  if (statusBtn) statusBtn.classList.add('active');
+  selectedStatus = report.status || 'alive';
+
+  // 座標與地址
+  selectedLat     = report.lat;
+  selectedLng     = report.lng;
+  selectedAddress = report.address || '';
+
+  // 舊照片 — 存入 keepImages，顯示為縮圖
+  let imgs = report.image_paths || [];
+  if (typeof imgs === 'string') { try { imgs = JSON.parse(imgs); } catch { imgs = []; } }
+  keepImages = [...imgs];
+  renderExistingPhotos();
+
+  // 標題與按鈕
+  document.querySelector('#report-modal .modal-header h2').textContent = '編輯通報';
+  document.getElementById('submit-btn').textContent = '💾 儲存修改';
+
+  // 顯示目前地點
+  if (selectedLat) showLocationBadge(selectedAddress || `${selectedLat.toFixed(5)}, ${selectedLng.toFixed(5)}`);
+
+  document.getElementById('detail-modal').classList.add('hidden');
+  document.getElementById('report-modal').classList.remove('hidden');
+
+  setTimeout(() => {
+    if (!miniMapReady) {
+      miniMapMap = L.map('mini-map').setView([selectedLat || 23.69, selectedLng || 120.96], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(miniMapMap);
+      miniMapMap.on('click', onMiniMapClick);
+      miniMapReady = true;
+    } else {
+      miniMapMap.invalidateSize();
+      if (selectedLat) miniMapMap.setView([selectedLat, selectedLng], 13);
+    }
+    if (selectedLat) {
+      if (miniMapMarker) miniMapMap.removeLayer(miniMapMarker);
+      miniMapMarker = L.marker([selectedLat, selectedLng]).addTo(miniMapMap);
+    }
+  }, 100);
+}
+
+function renderExistingPhotos() {
+  const grid        = document.getElementById('photo-preview');
+  const placeholder = document.getElementById('upload-placeholder');
+  grid.innerHTML    = '';
+
+  keepImages.forEach((url, i) => {
+    const thumb = document.createElement('div');
+    thumb.className = 'photo-thumb';
+    thumb.innerHTML = `
+      <img src="${url}" alt="" />
+      <button class="photo-remove" data-keep-index="${i}">✕</button>
+    `;
+    thumb.querySelector('.photo-remove').addEventListener('click', e => {
+      e.stopPropagation();
+      keepImages.splice(parseInt(e.target.dataset.keepIndex), 1);
+      renderExistingPhotos();
+    });
+    grid.appendChild(thumb);
+  });
+
+  placeholder.style.display = (keepImages.length + photoFiles.length) ? 'none' : '';
 }
 
 function resetReportForm() {
@@ -272,6 +354,8 @@ function resetReportForm() {
   selectedAddress = '';
   selectedStatus = 'alive';
   photoFiles = [];
+  keepImages = [];
+  editingReportId = null;
   miniMapMarker = null;
   addrMapMarker = null;
   gpsMapMarker  = null;
@@ -450,7 +534,7 @@ function renderPhotoPreview() {
     grid.appendChild(thumb);
   });
 
-  placeholder.style.display = photoFiles.length ? 'none' : '';
+  placeholder.style.display = (photoFiles.length + keepImages.length) ? 'none' : '';
 }
 
 // ── 提交 ──────────────────────────────────────────────────
@@ -478,20 +562,25 @@ async function submitReport() {
   fd.append('address', selectedAddress);
   fd.append('description', desc);
   photoFiles.forEach(f => fd.append('images', f));
+  if (editingReportId) fd.append('keep_images', JSON.stringify(keepImages));
+
+  const isEdit  = !!editingReportId;
+  const url     = isEdit ? `/api/reports/${editingReportId}` : '/api/reports';
+  const method  = isEdit ? 'PUT' : 'POST';
 
   try {
-    const res = await fetch('/api/reports', { method: 'POST', body: fd });
+    const res  = await fetch(url, { method, body: fd });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '提交失敗');
-    showToast('通報成功！感謝您的回報 🎉', 'success');
+    if (!res.ok) throw new Error(data.error || (isEdit ? '更新失敗' : '提交失敗'));
+    showToast(isEdit ? '✅ 通報已更新！' : '通報成功！感謝您的回報 🎉', 'success');
     closeReportModal();
     await loadReports();
-    // Fly to new marker
     if (selectedLat && selectedLng) mainMap.flyTo([selectedLat, selectedLng], 14);
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
-    btn.textContent = '📤 提交通報'; btn.disabled = false;
+    btn.textContent = isEdit ? '💾 儲存修改' : '📤 提交通報';
+    btn.disabled = false;
   }
 }
 
@@ -548,6 +637,16 @@ async function openDetailModal(id) {
     ${r.description ? `<div class="detail-desc">${r.description}</div>` : ''}
     <div class="detail-reporter">${reporter} ・ ${formatDate(r.created_at)}</div>
   `;
+
+  // 顯示編輯按鈕（本人才看得到）
+  const footer  = document.getElementById('detail-footer');
+  const editBtn = document.getElementById('edit-report-btn');
+  if (currentUser && currentUser.id === r.user_id) {
+    footer.style.display = '';
+    editBtn.onclick = () => openEditModal(r);
+  } else {
+    footer.style.display = 'none';
+  }
 
   document.getElementById('detail-modal').classList.remove('hidden');
 }
