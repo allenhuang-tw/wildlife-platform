@@ -52,10 +52,15 @@ header {
 
 .header-left { display: flex; align-items: center; gap: 10px; }
 
-.logo-wrap {
-  font-size: 28px;
-  line-height: 1;
-  filter: drop-shadow(0 2px 3px rgba(0,0,0,.4));
+.logo-wrap img {
+  width: 48px;
+  height: 36px;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 8px;
+  padding: 3px 5px;
+  display: block;
+  box-shadow: 0 1px 4px rgba(0,0,0,.25);
 }
 
 .brand { display: flex; flex-direction: column; }
