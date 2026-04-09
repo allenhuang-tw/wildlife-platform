@@ -25,6 +25,7 @@
     <div id="user-info" class="hidden">
       <img id="user-avatar" src="" alt="avatar" />
       <span id="user-name"></span>
+      <button id="my-reports-btn" class="btn-outline">📋 <span class="my-reports-label">我的通報</span></button>
       <button id="logout-btn" class="btn-outline">登出</button>
     </div>
     <!-- 未登入 -->
@@ -181,6 +182,19 @@
     <button id="delete-report-btn" class="btn-danger">🗑️ 刪除</button>
     <button id="edit-report-btn" class="btn-primary">✏️ 編輯通報</button>
   </div>
+  </div>
+</div>
+
+<!-- ═══════════════ MY REPORTS MODAL ═══════════════ -->
+<div id="my-reports-modal" class="modal-overlay hidden">
+  <div class="modal-box my-reports-box">
+    <div class="modal-header">
+      <h2>我的通報紀錄</h2>
+      <button class="close-btn" id="close-my-reports">✕</button>
+    </div>
+    <div class="modal-body" id="my-reports-body">
+      <div class="loading-text">載入中…</div>
+    </div>
   </div>
 </div>
 

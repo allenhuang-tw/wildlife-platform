@@ -723,7 +723,8 @@ button, input, select, textarea {
   /* Header */
   .brand-sub       { display: none; }
   .brand-title     { font-size: 15px; }
-  #user-name       { display: none; }          /* 登入後隱藏名字，只留頭像+登出 */
+  #user-name       { display: none; }          /* 登入後隱藏名字，只留頭像+按鈕 */
+  .my-reports-label { display: none; }         /* 手機版只顯示 icon */
   #user-info       { padding: 3px 10px 3px 3px; gap: 6px; }
   .line-btn        { padding: 8px 10px; gap: 6px; font-size: 13px; }
 
@@ -808,6 +809,76 @@ button, input, select, textarea {
   .upload-placeholder p    { font-size: 13px; }
   .upload-placeholder small{ font-size: 11px; }
 }
+
+/* ── MY REPORTS MODAL ────────────────────── */
+.my-reports-box { max-width: 500px; }
+
+.my-report-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background .15s;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 4px;
+}
+.my-report-item:hover { background: var(--bg); }
+.my-report-item:last-child { border-bottom: none; }
+
+.my-report-thumb {
+  width: 56px; height: 56px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+}
+.my-report-thumb img {
+  width: 100%; height: 100%;
+  object-fit: cover; border-radius: 7px;
+}
+
+.my-report-info { flex: 1; min-width: 0; }
+.my-report-species {
+  font-size: 15px; font-weight: 700;
+  color: var(--primary-dark);
+  margin-bottom: 3px;
+}
+.my-report-meta {
+  font-size: 12px; color: var(--text-muted);
+  margin-bottom: 6px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.my-report-reject {
+  font-size: 12px;
+  color: var(--dead);
+  background: #fee2e2;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border-left: 3px solid var(--dead);
+  margin-top: 4px;
+}
+
+.review-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.review-badge.pending  { background: #fef3c7; color: #92400e; }
+.review-badge.approved { background: #dcfce7; color: #14532d; }
+.review-badge.rejected { background: #fee2e2; color: #7f1d1d; }
+
+.loading-text { text-align: center; padding: 40px; color: var(--text-muted); }
+.empty-text   { text-align: center; padding: 40px; color: var(--text-muted); font-size: 15px; }
 
 /* Leaflet fix inside modal */
 .leaflet-container { font-family: inherit; }

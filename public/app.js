@@ -156,6 +156,16 @@ function bindEvents() {
     showToast('已登出');
   });
 
+  // 我的通報
+  document.getElementById('my-reports-btn').addEventListener('click', openMyReports);
+  document.getElementById('close-my-reports').addEventListener('click', () => {
+    document.getElementById('my-reports-modal').classList.add('hidden');
+  });
+  document.getElementById('my-reports-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('my-reports-modal'))
+      document.getElementById('my-reports-modal').classList.add('hidden');
+  });
+
   // Filter
   const filterInput = document.getElementById('filter-input');
   const filterClear = document.getElementById('filter-clear');
@@ -653,6 +663,55 @@ async function openDetailModal(id) {
   }
 
   document.getElementById('detail-modal').classList.remove('hidden');
+}
+
+// ── 我的通報 ──────────────────────────────────────────────
+const REVIEW_LABELS = { pending:'待審核', approved:'已核准', rejected:'已拒絕' };
+
+async function openMyReports() {
+  document.getElementById('my-reports-modal').classList.remove('hidden');
+  document.getElementById('my-reports-body').innerHTML = '<div class="loading-text">載入中…</div>';
+
+  const res     = await fetch('/api/my-reports');
+  const reports = await res.json();
+
+  if (!reports.length) {
+    document.getElementById('my-reports-body').innerHTML = '<div class="empty-text">尚未有任何通報紀錄</div>';
+    return;
+  }
+
+  document.getElementById('my-reports-body').innerHTML = reports.map(r => {
+    let imgs = r.image_paths || [];
+    if (typeof imgs === 'string') { try { imgs = JSON.parse(imgs); } catch { imgs = []; } }
+
+    const thumb = imgs.length
+      ? `<div class="my-report-thumb"><img src="${imgs[0]}" alt="" /></div>`
+      : `<div class="my-report-thumb">${getEmoji(r.species)}</div>`;
+
+    const status   = r.review_status || 'pending';
+    const addr     = r.address || `${Number(r.lat).toFixed(4)}, ${Number(r.lng).toFixed(4)}`;
+    const rejected = status === 'rejected' && r.reject_reason
+      ? `<div class="my-report-reject">拒絕原因：${r.reject_reason}</div>` : '';
+
+    return `
+      <div class="my-report-item" onclick="flyToReport(${r.lat}, ${r.lng}, ${r.id})">
+        ${thumb}
+        <div class="my-report-info">
+          <div class="my-report-species">${getEmoji(r.species)} ${r.species} ×${r.quantity}</div>
+          <div class="my-report-meta">📍 ${addr}　${formatDate(r.created_at)}</div>
+          ${rejected}
+        </div>
+        <span class="review-badge ${status}">${REVIEW_LABELS[status] || status}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function flyToReport(lat, lng, id) {
+  document.getElementById('my-reports-modal').classList.add('hidden');
+  mainMap.flyTo([lat, lng], 15);
+  // 若是已核准，開啟 popup
+  setTimeout(() => openDetailModal(id), 800);
 }
 
 // ── 刪除通報 ──────────────────────────────────────────────

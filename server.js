@@ -159,6 +159,17 @@ app.post('/auth/logout', (req, res) => {
 });
 
 // ── 通報 API ──────────────────────────────────────────────
+// 使用者查自己的通報（含審核狀態）
+app.get('/api/my-reports', requireAuth, async (req, res) => {
+  const user = getUser(req);
+  const { data, error } = await supabase
+    .from('reports').select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
 app.get('/api/reports', async (req, res) => {
   const { species } = req.query;
   let query = supabase.from('reports').select('*')
