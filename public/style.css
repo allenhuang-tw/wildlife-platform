@@ -690,15 +690,109 @@ textarea { resize: vertical; width: 100%; }
 /* ── UTILITIES ───────────────────────────────── */
 .hidden { display: none !important; }
 
+/* 全域觸控優化 */
+button, input, select, textarea {
+  touch-action: manipulation; /* 防止雙擊縮放 */
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* ── RESPONSIVE ──────────────────────────────── */
+
+/* ── 平板 / 較大手機 ≤ 768px ─── */
+@media (max-width: 768px) {
+  .legend { display: none; }
+  .filter-wrap { max-width: 100%; flex: 1; }
+}
+
+/* ── 手機 ≤ 600px ─── */
 @media (max-width: 600px) {
-  .brand-sub, .legend { display: none; }
-  .toolbar { gap: 8px; }
-  .filter-wrap { max-width: 100%; }
+  /* Header */
+  .brand-sub       { display: none; }
+  .brand-title     { font-size: 15px; }
+  #user-name       { display: none; }          /* 登入後隱藏名字，只留頭像+登出 */
+  #user-info       { padding: 3px 10px 3px 3px; gap: 6px; }
+  .line-btn        { padding: 8px 10px; gap: 6px; font-size: 13px; }
+
+  /* Toolbar */
+  .toolbar { gap: 6px; padding: 0 10px; }
+  .stats   { font-size: 12px; }
+
+  /* Modal — 從底部滑出（bottom sheet） */
+  .modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .modal-box {
+    border-radius: var(--radius) var(--radius) 0 0;
+    max-width: 100%;
+    max-height: 93dvh;           /* 留一點空間看到地圖 */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal-body {
+    max-height: none;
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* iOS 安全區域（瀏海 / 底部 Home Bar） */
+  .modal-footer {
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  }
+  #report-fab {
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    right: 16px;
+    padding: 12px 18px;
+  }
+
+  /* 表單欄位 */
   .form-row.two-col { grid-template-columns: 1fr; }
-  .modal-overlay { padding: 0; align-items: flex-end; }
-  .modal-box { border-radius: var(--radius) var(--radius) 0 0; max-width: 100%; }
-  #report-fab { bottom: 20px; right: 16px; }
+
+  /* 定位 Tab 按鈕 — 更好按 */
+  .tab-btn { padding: 11px 6px; font-size: 13px; }
+
+  /* 狀態按鈕 — 兩行排列 */
+  .status-btns     { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .status-btn      { min-width: unset; padding: 11px 8px; font-size: 13px; }
+
+  /* 地點 badge — 長地址不溢出 */
+  .location-badge  { overflow: hidden; }
+  #location-text   {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+
+  /* 詳情 metadata 單欄 */
+  .detail-meta     { grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+
+  /* Mini map 高度手機略調高 */
+  #mini-map, .addr-result-map { height: 180px; }
+
+  /* Toast 不擋 FAB */
+  .toast { bottom: calc(80px + env(safe-area-inset-bottom)); }
+
+  /* 登入提示 Modal */
+  .login-box { max-width: 100%; border-radius: var(--radius) var(--radius) 0 0; }
+  .login-box .modal-body { padding: 28px 20px calc(20px + env(safe-area-inset-bottom)); }
+
+  /* Leaflet popup 較大文字 */
+  .popup-species { font-size: 15px; }
+  .popup-open    { padding: 11px; font-size: 14px; }
+}
+
+/* ── 超小手機 ≤ 380px（如 iPhone SE） ─── */
+@media (max-width: 380px) {
+  .brand-title  { font-size: 13px; }
+  .logo-wrap img { width: 38px; height: 28px; }
+  .line-btn span:not(svg) { display: none; }   /* 只保留 LINE icon */
+  .tab-btn      { font-size: 12px; padding: 10px 4px; }
+  .status-btn   { font-size: 12px; padding: 10px 4px; }
+  .form-section h3 { font-size: 14px; }
+  .upload-placeholder p    { font-size: 13px; }
+  .upload-placeholder small{ font-size: 11px; }
 }
 
 /* Leaflet fix inside modal */
