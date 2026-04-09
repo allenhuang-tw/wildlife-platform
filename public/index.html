@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>野生動物通報平台</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ═══════════════ HEADER ═══════════════ -->
+<header>
+  <div class="header-left">
+    <div class="logo-wrap">🦌</div>
+    <div class="brand">
+      <span class="brand-title">野生動物通報</span>
+      <span class="brand-sub">Taiwan Wildlife Watch</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <!-- 已登入 -->
+    <div id="user-info" class="hidden">
+      <img id="user-avatar" src="" alt="avatar" />
+      <span id="user-name"></span>
+      <button id="logout-btn" class="btn-outline">登出</button>
+    </div>
+    <!-- 未登入 -->
+    <button id="line-login-btn" class="line-btn">
+      <svg viewBox="0 0 512 512" width="20" height="20"><path fill="#fff" d="M256 0C114.6 0 0 99.7 0 222.7c0 110.1 97.7 202.3 229.9 219.7 8.9 1.9 21.1 5.9 24.2 13.6 2.8 7 1.8 17.9 0.9 24.9l-3.9 23.6c-1.2 7-5.5 27.2 23.8 14.8s158-93 215.7-159.3C527.3 315.8 512 270.6 512 222.7 512 99.7 397.4 0 256 0z"/></svg>
+      使用 LINE 登入
+    </button>
+  </div>
+</header>
+
+<!-- ═══════════════ TOOLBAR ═══════════════ -->
+<div class="toolbar">
+  <div class="stats">
+    共 <strong id="total-reports">0</strong> 筆通報
+  </div>
+  <div class="filter-wrap">
+    <input id="filter-input" type="text" placeholder="🔍 篩選物種..." />
+    <button id="filter-clear" class="hidden">✕</button>
+  </div>
+  <div class="legend">
+    <span class="legend-dot alive"></span>存活
+    <span class="legend-dot injured"></span>受傷
+    <span class="legend-dot dead"></span>死亡
+    <span class="legend-dot unknown"></span>不確定
+  </div>
+</div>
+
+<!-- ═══════════════ MAP ═══════════════ -->
+<div id="map"></div>
+
+<!-- ═══════════════ FAB ═══════════════ -->
+<button id="report-fab" title="新增通報">
+  <span class="fab-icon">＋</span>
+  <span class="fab-label">通報</span>
+</button>
+
+<!-- ═══════════════ REPORT MODAL ═══════════════ -->
+<div id="report-modal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>新增野生動物通報</h2>
+      <button class="close-btn" id="close-report-modal">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- 地點 -->
+      <section class="form-section">
+        <h3><span class="sec-icon">📍</span> 通報地點</h3>
+        <div class="tab-btns">
+          <button class="tab-btn active" data-tab="map">地圖點選</button>
+          <button class="tab-btn" data-tab="address">輸入地址</button>
+          <button class="tab-btn" data-tab="gps">自動定位</button>
+        </div>
+
+        <!-- 地圖點選 -->
+        <div id="tab-map" class="tab-pane">
+          <p class="hint">在下方地圖點選通報位置</p>
+          <div id="mini-map"></div>
+        </div>
+
+        <!-- 輸入地址 -->
+        <div id="tab-address" class="tab-pane hidden">
+          <div class="addr-row">
+            <input id="addr-input" type="text" placeholder="請輸入地址或地名…" />
+            <button id="addr-search-btn" class="btn-secondary">搜尋</button>
+          </div>
+          <div id="addr-result-map" class="addr-result-map hidden"></div>
+        </div>
+
+        <!-- 自動定位 -->
+        <div id="tab-gps" class="tab-pane hidden">
+          <button id="gps-btn" class="btn-gps">
+            <span>📡</span> 取得目前位置
+          </button>
+          <div id="gps-result-map" class="addr-result-map hidden"></div>
+        </div>
+
+        <div id="location-badge" class="location-badge hidden">
+          <span class="badge-icon">✅</span>
+          <span id="location-text">已選擇位置</span>
+        </div>
+      </section>
+
+      <!-- 物種 -->
+      <section class="form-section">
+        <h3><span class="sec-icon">🦎</span> 物種資訊</h3>
+        <div class="form-row two-col">
+          <div class="field">
+            <label>物種名稱 <em>*</em></label>
+            <input id="species-input" type="text" placeholder="如：台灣黑熊、石虎…" list="species-list" />
+            <datalist id="species-list">
+              <option value="台灣黑熊"><option value="石虎"><option value="台灣獼猴">
+              <option value="山羌"><option value="水鹿"><option value="梅花鹿">
+              <option value="台灣野豬"><option value="白鼻心"><option value="鼬獾">
+              <option value="麝香貓"><option value="飛鼠"><option value="赤腹松鼠">
+              <option value="台灣藍鵲"><option value="領角鴞"><option value="鳳頭蒼鷹">
+              <option value="台灣黑鳶"><option value="台灣草蜥"><option value="雨傘節">
+              <option value="龜殼花"><option value="眼鏡蛇"><option value="百步蛇">
+              <option value="緬甸蟒"><option value="草龜"><option value="斑龜">
+            </datalist>
+          </div>
+          <div class="field">
+            <label>數量</label>
+            <input id="qty-input" type="number" value="1" min="1" max="9999" />
+          </div>
+        </div>
+        <div class="field">
+          <label>動物狀態</label>
+          <div class="status-btns">
+            <button class="status-btn active" data-status="alive">🟢 存活</button>
+            <button class="status-btn" data-status="injured">🟠 受傷</button>
+            <button class="status-btn" data-status="dead">🔴 死亡</button>
+            <button class="status-btn" data-status="unknown">⚪ 不確定</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 照片 -->
+      <section class="form-section">
+        <h3><span class="sec-icon">📷</span> 照片（最多 5 張）</h3>
+        <div class="upload-area" id="upload-area">
+          <input type="file" id="photo-input" accept="image/*" multiple />
+          <div class="upload-placeholder" id="upload-placeholder">
+            <span class="upload-icon">📸</span>
+            <p>點擊或拖曳照片至此</p>
+            <small>JPG・PNG・HEIC・最大 15MB／張</small>
+          </div>
+          <div id="photo-preview" class="photo-grid"></div>
+        </div>
+      </section>
+
+      <!-- 描述 -->
+      <section class="form-section">
+        <h3><span class="sec-icon">📝</span> 補充描述</h3>
+        <textarea id="desc-input" rows="3" placeholder="請描述觀察情況、行為、周遭環境等…"></textarea>
+      </section>
+
+    </div>
+    <div class="modal-footer">
+      <button id="submit-btn" class="btn-primary">📤 提交通報</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ DETAIL MODAL ═══════════════ -->
+<div id="detail-modal" class="modal-overlay hidden">
+  <div class="modal-box detail-box">
+    <div class="modal-header">
+      <h2 id="detail-title">通報詳情</h2>
+      <button class="close-btn" id="close-detail-modal">✕</button>
+    </div>
+    <div class="modal-body" id="detail-body"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ TOAST ═══════════════ -->
+<div id="toast" class="toast hidden"></div>
+
+<!-- ═══════════════ LOGIN PROMPT ═══════════════ -->
+<div id="login-prompt" class="modal-overlay hidden">
+  <div class="modal-box login-box">
+    <div class="login-icon">🔐</div>
+    <h2>需要登入</h2>
+    <p>提交通報需要先以 LINE 帳號登入<br/>瀏覽所有通報紀錄無需登入</p>
+    <button id="login-prompt-btn" class="line-btn large">
+      <svg viewBox="0 0 512 512" width="22" height="22"><path fill="#fff" d="M256 0C114.6 0 0 99.7 0 222.7c0 110.1 97.7 202.3 229.9 219.7 8.9 1.9 21.1 5.9 24.2 13.6 2.8 7 1.8 17.9 0.9 24.9l-3.9 23.6c-1.2 7-5.5 27.2 23.8 14.8s158-93 215.7-159.3C527.3 315.8 512 270.6 512 222.7 512 99.7 397.4 0 256 0z"/></svg>
+      使用 LINE 登入
+    </button>
+    <button id="login-prompt-cancel" class="btn-text">稍後再說</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

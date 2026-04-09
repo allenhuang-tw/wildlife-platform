@@ -1,0 +1,577 @@
+/* ═══════════════════════════════════════════════════════
+   野生動物通報平台 — 前端邏輯
+   ═══════════════════════════════════════════════════════ */
+
+// ── 物種 Emoji 對照 ─────────────────────────────────────
+const SPECIES_EMOJI = {
+  '台灣黑熊':'🐻','黑熊':'🐻',
+  '石虎':'🐆',
+  '台灣獼猴':'🐒','獼猴':'🐒',
+  '山羌':'🦌','水鹿':'🦌','梅花鹿':'🦌',
+  '台灣野豬':'🐗','野豬':'🐗',
+  '白鼻心':'🦡','鼬獾':'🦡',
+  '飛鼠':'🦇','蝙蝠':'🦇',
+  '赤腹松鼠':'🐿️','松鼠':'🐿️',
+  '台灣藍鵲':'🦚','藍鵲':'🦚',
+  '領角鴞':'🦉','貓頭鷹':'🦉',
+  '鳳頭蒼鷹':'🦅','老鷹':'🦅','台灣黑鳶':'🦅',
+  '雨傘節':'🐍','龜殼花':'🐍','眼鏡蛇':'🐍','百步蛇':'🐍','蛇':'🐍',
+  '台灣草蜥':'🦎','蜥蜴':'🦎',
+  '草龜':'🐢','斑龜':'🐢','龜':'🐢',
+  '緬甸蟒':'🐍','蟒':'🐍',
+};
+function getEmoji(species) {
+  for (const [k, v] of Object.entries(SPECIES_EMOJI)) {
+    if (species.includes(k)) return v;
+  }
+  return '🦎';
+}
+
+const STATUS_LABELS = { alive:'存活', injured:'受傷', dead:'死亡', unknown:'不確定' };
+const STATUS_COLORS = { alive:'#22c55e', injured:'#f97316', dead:'#ef4444', unknown:'#94a3b8' };
+
+// ── 全域狀態 ────────────────────────────────────────────
+let mainMap, miniMapMap, addrMap, gpsMap;
+let markersLayer;
+let allReports = [];
+let currentUser = null;
+let selectedLat = null, selectedLng = null;
+let selectedAddress = '';
+let selectedStatus = 'alive';
+let photoFiles = [];
+let activeTab = 'map';
+let miniMapMarker = null;
+let addrMapMarker = null;
+let gpsMapMarker  = null;
+let miniMapReady = false;
+
+// ── 啟動 ────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  initMainMap();
+  await checkAuth();
+  await loadReports();
+  bindEvents();
+  checkUrlError();
+});
+
+// ── 認證 ─────────────────────────────────────────────────
+async function checkAuth() {
+  const res = await fetch('/auth/user');
+  const data = await res.json();
+  currentUser = data.user;
+  renderAuthUI();
+}
+
+function renderAuthUI() {
+  const loginBtn = document.getElementById('line-login-btn');
+  const userInfo = document.getElementById('user-info');
+  if (currentUser) {
+    loginBtn.classList.add('hidden');
+    userInfo.classList.remove('hidden');
+    document.getElementById('user-avatar').src = currentUser.avatar || '';
+    document.getElementById('user-name').textContent = currentUser.name;
+  } else {
+    loginBtn.classList.remove('hidden');
+    userInfo.classList.add('hidden');
+  }
+}
+
+// ── 主地圖 ────────────────────────────────────────────────
+function initMainMap() {
+  mainMap = L.map('map', { zoomControl: true }).setView([23.6978, 120.9605], 8);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org">OpenStreetMap</a>',
+    maxZoom: 19
+  }).addTo(mainMap);
+  markersLayer = L.layerGroup().addTo(mainMap);
+}
+
+// ── 讀取通報 ──────────────────────────────────────────────
+async function loadReports(filterSpecies = '') {
+  const url = filterSpecies ? `/api/reports?species=${encodeURIComponent(filterSpecies)}` : '/api/reports';
+  const res = await fetch(url);
+  allReports = await res.json();
+  renderMarkers(allReports);
+  document.getElementById('total-reports').textContent = allReports.length;
+}
+
+function renderMarkers(reports) {
+  markersLayer.clearLayers();
+  reports.forEach(r => {
+    const icon = createMarkerIcon(r.status, r.species);
+    const marker = L.marker([r.lat, r.lng], { icon }).addTo(markersLayer);
+    marker.bindPopup(makePopupHtml(r), { maxWidth: 240 });
+    marker.on('popupopen', () => {
+      document.getElementById(`popup-open-${r.id}`)
+        ?.addEventListener('click', () => openDetailModal(r.id));
+    });
+  });
+}
+
+function createMarkerIcon(status, species) {
+  const color = STATUS_COLORS[status] || STATUS_COLORS.unknown;
+  const emoji = getEmoji(species);
+  return L.divIcon({
+    html: `<div class="marker-icon" style="
+      width:40px;height:40px;
+      background:${color};
+    ">${emoji}</div>`,
+    className: '',
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+    popupAnchor: [0, -22]
+  });
+}
+
+function makePopupHtml(r) {
+  const statusLabel = STATUS_LABELS[r.status] || r.status;
+  const color = STATUS_COLORS[r.status] || STATUS_COLORS.unknown;
+  return `
+    <div class="popup-inner">
+      <div class="popup-species">${getEmoji(r.species)} ${r.species}</div>
+      <div class="popup-meta">
+        數量：${r.quantity} 隻 ・
+        <span style="color:${color};font-weight:600">${statusLabel}</span>
+      </div>
+      ${r.address ? `<div class="popup-meta">📍 ${r.address}</div>` : ''}
+      <div class="popup-meta">${formatDate(r.created_at)}</div>
+    </div>
+    <button class="popup-open" id="popup-open-${r.id}">查看詳情 →</button>
+  `;
+}
+
+// ── 事件綁定 ──────────────────────────────────────────────
+function bindEvents() {
+  // Header auth
+  document.getElementById('line-login-btn').addEventListener('click', () => window.location.href = '/auth/line');
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    await fetch('/auth/logout', { method: 'POST' });
+    currentUser = null;
+    renderAuthUI();
+    showToast('已登出');
+  });
+
+  // Filter
+  const filterInput = document.getElementById('filter-input');
+  const filterClear = document.getElementById('filter-clear');
+  let filterTimer;
+  filterInput.addEventListener('input', () => {
+    clearTimeout(filterTimer);
+    const val = filterInput.value.trim();
+    filterClear.classList.toggle('hidden', !val);
+    filterTimer = setTimeout(() => loadReports(val), 400);
+  });
+  filterClear.addEventListener('click', () => {
+    filterInput.value = '';
+    filterClear.classList.add('hidden');
+    loadReports();
+  });
+
+  // FAB
+  document.getElementById('report-fab').addEventListener('click', () => {
+    if (!currentUser) { showLoginPrompt(); return; }
+    openReportModal();
+  });
+
+  // Report modal close
+  document.getElementById('close-report-modal').addEventListener('click', closeReportModal);
+  document.getElementById('report-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('report-modal')) closeReportModal();
+  });
+
+  // Location tabs
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+
+  // Address search
+  document.getElementById('addr-search-btn').addEventListener('click', geocodeAddress);
+  document.getElementById('addr-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') geocodeAddress();
+  });
+
+  // GPS
+  document.getElementById('gps-btn').addEventListener('click', getGPSLocation);
+
+  // Status buttons
+  document.querySelectorAll('.status-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedStatus = btn.dataset.status;
+    });
+  });
+
+  // Photo upload
+  const uploadArea = document.getElementById('upload-area');
+  const photoInput = document.getElementById('photo-input');
+
+  uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+  uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+  uploadArea.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadArea.classList.remove('drag-over');
+    addPhotos(Array.from(e.dataTransfer.files));
+  });
+  photoInput.addEventListener('change', () => {
+    addPhotos(Array.from(photoInput.files));
+    photoInput.value = '';
+  });
+
+  // Submit
+  document.getElementById('submit-btn').addEventListener('click', submitReport);
+
+  // Detail modal close
+  document.getElementById('close-detail-modal').addEventListener('click', () => {
+    document.getElementById('detail-modal').classList.add('hidden');
+  });
+  document.getElementById('detail-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('detail-modal'))
+      document.getElementById('detail-modal').classList.add('hidden');
+  });
+
+  // Login prompt
+  document.getElementById('login-prompt-btn').addEventListener('click', () => window.location.href = '/auth/line');
+  document.getElementById('login-prompt-cancel').addEventListener('click', () => {
+    document.getElementById('login-prompt').classList.add('hidden');
+  });
+  document.getElementById('login-prompt').addEventListener('click', e => {
+    if (e.target === document.getElementById('login-prompt'))
+      document.getElementById('login-prompt').classList.add('hidden');
+  });
+}
+
+// ── 通報 Modal ────────────────────────────────────────────
+function openReportModal() {
+  resetReportForm();
+  document.getElementById('report-modal').classList.remove('hidden');
+
+  // Init mini-map after modal is visible
+  setTimeout(() => {
+    if (!miniMapReady) {
+      miniMapMap = L.map('mini-map').setView([23.6978, 120.9605], 8);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(miniMapMap);
+      miniMapMap.on('click', onMiniMapClick);
+      miniMapReady = true;
+    } else {
+      miniMapMap.invalidateSize();
+    }
+  }, 100);
+}
+
+function closeReportModal() {
+  document.getElementById('report-modal').classList.add('hidden');
+}
+
+function resetReportForm() {
+  selectedLat = null;
+  selectedLng = null;
+  selectedAddress = '';
+  selectedStatus = 'alive';
+  photoFiles = [];
+  miniMapMarker = null;
+  addrMapMarker = null;
+  gpsMapMarker  = null;
+
+  document.getElementById('species-input').value = '';
+  document.getElementById('qty-input').value = '1';
+  document.getElementById('desc-input').value = '';
+  document.getElementById('addr-input').value = '';
+  document.getElementById('photo-preview').innerHTML = '';
+  document.getElementById('upload-placeholder').style.display = '';
+
+  document.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('.status-btn[data-status="alive"]').classList.add('active');
+
+  document.getElementById('location-badge').classList.add('hidden');
+  document.getElementById('addr-result-map').classList.add('hidden');
+  document.getElementById('gps-result-map').classList.add('hidden');
+
+  switchTab('map');
+}
+
+// ── 定位 Tab ──────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tab);
+  });
+  document.getElementById('tab-map').classList.toggle('hidden', tab !== 'map');
+  document.getElementById('tab-address').classList.toggle('hidden', tab !== 'address');
+  document.getElementById('tab-gps').classList.toggle('hidden', tab !== 'gps');
+
+  if (tab === 'map' && miniMapReady) miniMapMap.invalidateSize();
+  if (tab === 'address' && addrMap)   addrMap.invalidateSize();
+  if (tab === 'gps'     && gpsMap)    gpsMap.invalidateSize();
+}
+
+function onMiniMapClick(e) {
+  const { lat, lng } = e.latlng;
+  setLocationFromCoords(lat, lng, miniMapMap, (m) => { miniMapMarker = m; }, miniMapMarker);
+}
+
+function setLocationFromCoords(lat, lng, map, setMarker, oldMarker) {
+  if (oldMarker) map.removeLayer(oldMarker);
+  const marker = L.marker([lat, lng]).addTo(map);
+  setMarker(marker);
+  selectedLat = lat;
+  selectedLng = lng;
+
+  reverseGeocode(lat, lng).then(addr => {
+    selectedAddress = addr;
+    showLocationBadge(`${addr || `${lat.toFixed(5)}, ${lng.toFixed(5)}`}`);
+  });
+}
+
+// Address search
+async function geocodeAddress() {
+  const q = document.getElementById('addr-input').value.trim();
+  if (!q) return;
+
+  const btn = document.getElementById('addr-search-btn');
+  btn.textContent = '搜尋中…'; btn.disabled = true;
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=tw&accept-language=zh-TW`,
+      { headers: { 'Accept-Language': 'zh-TW' } }
+    );
+    const data = await res.json();
+    if (!data.length) { showToast('找不到該地址', 'error'); return; }
+
+    const { lat, lon, display_name } = data[0];
+    selectedLat = parseFloat(lat);
+    selectedLng = parseFloat(lon);
+    selectedAddress = q;
+
+    // Show result map
+    const mapEl = document.getElementById('addr-result-map');
+    mapEl.classList.remove('hidden');
+    if (!addrMap) {
+      addrMap = L.map('addr-result-map').setView([selectedLat, selectedLng], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(addrMap);
+    } else {
+      addrMap.setView([selectedLat, selectedLng], 15);
+      if (addrMapMarker) addrMap.removeLayer(addrMapMarker);
+    }
+    addrMapMarker = L.marker([selectedLat, selectedLng]).addTo(addrMap);
+    addrMap.invalidateSize();
+    showLocationBadge(q);
+  } catch {
+    showToast('搜尋失敗，請稍後再試', 'error');
+  } finally {
+    btn.textContent = '搜尋'; btn.disabled = false;
+  }
+}
+
+// GPS
+function getGPSLocation() {
+  const btn = document.getElementById('gps-btn');
+  if (!navigator.geolocation) { showToast('瀏覽器不支援定位', 'error'); return; }
+  btn.textContent = '📡 定位中…'; btn.disabled = true;
+
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    selectedLat = lat; selectedLng = lng;
+
+    const mapEl = document.getElementById('gps-result-map');
+    mapEl.classList.remove('hidden');
+    if (!gpsMap) {
+      gpsMap = L.map('gps-result-map').setView([lat, lng], 16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(gpsMap);
+    } else {
+      gpsMap.setView([lat, lng], 16);
+      if (gpsMapMarker) gpsMap.removeLayer(gpsMapMarker);
+    }
+    gpsMapMarker = L.marker([lat, lng]).addTo(gpsMap);
+    gpsMap.invalidateSize();
+
+    const addr = await reverseGeocode(lat, lng);
+    selectedAddress = addr;
+    showLocationBadge(addr || `${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+
+    btn.textContent = '📡 取得目前位置'; btn.disabled = false;
+  }, err => {
+    showToast('無法取得位置：' + err.message, 'error');
+    btn.textContent = '📡 取得目前位置'; btn.disabled = false;
+  }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+function showLocationBadge(text) {
+  const badge = document.getElementById('location-badge');
+  document.getElementById('location-text').textContent = text;
+  badge.classList.remove('hidden');
+}
+
+async function reverseGeocode(lat, lng) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=zh-TW`
+    );
+    const data = await res.json();
+    return data.display_name || '';
+  } catch { return ''; }
+}
+
+// ── 照片 ──────────────────────────────────────────────────
+function addPhotos(files) {
+  const allowed = files.filter(f => f.type.startsWith('image/'));
+  const remaining = 5 - photoFiles.length;
+  const toAdd = allowed.slice(0, remaining);
+  if (!toAdd.length) return;
+  photoFiles.push(...toAdd);
+  renderPhotoPreview();
+}
+
+function renderPhotoPreview() {
+  const grid = document.getElementById('photo-preview');
+  const placeholder = document.getElementById('upload-placeholder');
+  grid.innerHTML = '';
+
+  photoFiles.forEach((file, i) => {
+    const url = URL.createObjectURL(file);
+    const thumb = document.createElement('div');
+    thumb.className = 'photo-thumb';
+    thumb.innerHTML = `
+      <img src="${url}" alt="" />
+      <button class="photo-remove" data-index="${i}">✕</button>
+    `;
+    thumb.querySelector('.photo-remove').addEventListener('click', e => {
+      e.stopPropagation();
+      photoFiles.splice(parseInt(e.target.dataset.index), 1);
+      renderPhotoPreview();
+    });
+    grid.appendChild(thumb);
+  });
+
+  placeholder.style.display = photoFiles.length ? 'none' : '';
+}
+
+// ── 提交 ──────────────────────────────────────────────────
+async function submitReport() {
+  if (!currentUser) { showLoginPrompt(); return; }
+
+  const species = document.getElementById('species-input').value.trim();
+  const qty     = document.getElementById('qty-input').value;
+  const desc    = document.getElementById('desc-input').value.trim();
+
+  if (!species) { showToast('請填寫物種名稱', 'error'); return; }
+  if (selectedLat === null || selectedLng === null) {
+    showToast('請選擇通報地點', 'error'); return;
+  }
+
+  const btn = document.getElementById('submit-btn');
+  btn.textContent = '上傳中…'; btn.disabled = true;
+
+  const fd = new FormData();
+  fd.append('species', species);
+  fd.append('quantity', qty);
+  fd.append('status', selectedStatus);
+  fd.append('lat', selectedLat);
+  fd.append('lng', selectedLng);
+  fd.append('address', selectedAddress);
+  fd.append('description', desc);
+  photoFiles.forEach(f => fd.append('images', f));
+
+  try {
+    const res = await fetch('/api/reports', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '提交失敗');
+    showToast('通報成功！感謝您的回報 🎉', 'success');
+    closeReportModal();
+    await loadReports();
+    // Fly to new marker
+    if (selectedLat && selectedLng) mainMap.flyTo([selectedLat, selectedLng], 14);
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    btn.textContent = '📤 提交通報'; btn.disabled = false;
+  }
+}
+
+// ── 詳情 Modal ────────────────────────────────────────────
+async function openDetailModal(id) {
+  const res = await fetch(`/api/reports/${id}`);
+  const r = await res.json();
+
+  document.getElementById('detail-title').textContent = `${getEmoji(r.species)} ${r.species}`;
+
+  const statusLabel = STATUS_LABELS[r.status] || r.status;
+  const addr = r.address || `${Number(r.lat).toFixed(5)}, ${Number(r.lng).toFixed(5)}`;
+  const reporter = r.user_name
+    ? `<img src="${r.user_avatar || ''}" onerror="this.style.display='none'" /><span>由 ${r.user_name} 通報</span>`
+    : '<span>由匿名用戶通報（範例資料）</span>';
+
+  const imgs = (r.image_paths || []).length
+    ? `<div class="detail-images">${r.image_paths.map(p =>
+        `<img src="${p}" alt="" onclick="window.open('${p}')">`
+      ).join('')}</div>`
+    : '';
+
+  document.getElementById('detail-body').innerHTML = `
+    ${imgs}
+    <div class="detail-meta">
+      <div class="detail-row">
+        <span class="detail-label">物種</span>
+        <span class="detail-value">${r.species}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">數量</span>
+        <span class="detail-value">${r.quantity} 隻</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">狀態</span>
+        <span class="detail-value">
+          <span class="status-badge ${r.status}">${statusLabel}</span>
+        </span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">通報時間</span>
+        <span class="detail-value" style="font-size:13px">${formatDate(r.created_at)}</span>
+      </div>
+    </div>
+    <div class="detail-row" style="margin-bottom:12px">
+      <span class="detail-label">地點</span>
+      <span class="detail-value" style="font-size:13px;font-weight:500;margin-top:4px;display:block">📍 ${addr}</span>
+    </div>
+    ${r.description ? `<div class="detail-desc">${r.description}</div>` : ''}
+    <div class="detail-reporter">${reporter} ・ ${formatDate(r.created_at)}</div>
+  `;
+
+  document.getElementById('detail-modal').classList.remove('hidden');
+}
+
+// ── Login prompt ──────────────────────────────────────────
+function showLoginPrompt() {
+  document.getElementById('login-prompt').classList.remove('hidden');
+}
+
+// ── Utilities ─────────────────────────────────────────────
+function formatDate(str) {
+  if (!str) return '';
+  const d = new Date(str);
+  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+let toastTimer;
+function showToast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast${type ? ' ' + type : ''}`;
+  el.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), 3000);
+}
+
+function checkUrlError() {
+  const params = new URLSearchParams(location.search);
+  const err = params.get('error');
+  if (err) {
+    const msgs = {
+      auth_failed: 'LINE 登入失敗，請再試一次',
+      invalid_state: '安全驗證失敗，請重試',
+    };
+    showToast(msgs[err] || `登入錯誤：${err}`, 'error');
+    history.replaceState({}, '', '/');
+  }
+}
