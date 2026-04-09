@@ -644,7 +644,10 @@ async function openDetailModal(id) {
   if (currentUser && currentUser.id === r.user_id) {
     footer.style.display = '';
     editBtn.onclick = () => openEditModal(r);
-    document.getElementById('delete-report-btn').onclick = () => deleteReport(r.id, r.species);
+    const delBtn = document.getElementById('delete-report-btn');
+    delBtn.textContent = '🗑️ 刪除';
+    delBtn.disabled = false;
+    delBtn.onclick = () => deleteReport(r.id, r.species);
   } else {
     footer.style.display = 'none';
   }
