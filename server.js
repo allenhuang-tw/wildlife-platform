@@ -178,6 +178,27 @@ app.delete('/api/reports/:id', requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+// ── 健康檢查 ──────────────────────────────────────────────
+app.get('/api/health', async (req, res) => {
+  const checks = {
+    supabase_url:  !!process.env.SUPABASE_URL,
+    supabase_key:  !!process.env.SUPABASE_SERVICE_KEY,
+    line_id:       !!process.env.LINE_CLIENT_ID,
+    line_secret:   !!process.env.LINE_CLIENT_SECRET,
+    line_redirect: process.env.LINE_REDIRECT_URI || '(未設定)',
+    db: false,
+    db_error: null,
+  };
+  try {
+    const { error } = await supabase.from('reports').select('id').limit(1);
+    checks.db = !error;
+    if (error) checks.db_error = error.message;
+  } catch (e) {
+    checks.db_error = e.message;
+  }
+  res.json(checks);
+});
+
 // ── 啟動 ─────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n🦌 野生動物通報平台已啟動 → http://localhost:${PORT}\n`);
