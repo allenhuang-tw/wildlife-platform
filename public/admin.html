@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>管理後台 — 野生動物通報平台</title>
+  <link rel="icon" type="image/png" href="/wildlife.png" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+
+<header class="admin-header">
+  <div class="admin-header-left">
+    <img src="/wildlife.png" alt="logo" class="admin-logo" />
+    <div>
+      <div class="admin-title">管理後台</div>
+      <div class="admin-sub">野生動物通報平台</div>
+    </div>
+  </div>
+  <div class="admin-header-right">
+    <div id="admin-user" class="hidden">
+      <img id="admin-avatar" src="" alt="" />
+      <span id="admin-name"></span>
+    </div>
+    <a href="/" class="btn-ghost">← 回主頁</a>
+    <button id="admin-logout" class="btn-ghost">登出</button>
+  </div>
+</header>
+
+<!-- 未登入 / 無權限 -->
+<div id="no-access" class="center-screen hidden">
+  <div class="access-card">
+    <div class="access-icon">🔒</div>
+    <h2 id="no-access-title">需要管理員權限</h2>
+    <p id="no-access-msg">請使用管理員 LINE 帳號登入</p>
+    <a href="/auth/line" class="line-btn-admin">
+      <svg viewBox="0 0 512 512" width="20" height="20"><path fill="#fff" d="M256 0C114.6 0 0 99.7 0 222.7c0 110.1 97.7 202.3 229.9 219.7 8.9 1.9 21.1 5.9 24.2 13.6 2.8 7 1.8 17.9 0.9 24.9l-3.9 23.6c-1.2 7-5.5 27.2 23.8 14.8s158-93 215.7-159.3C527.3 315.8 512 270.6 512 222.7 512 99.7 397.4 0 256 0z"/></svg>
+      使用 LINE 登入
+    </a>
+  </div>
+</div>
+
+<!-- 主內容 -->
+<div id="admin-main" class="hidden">
+  <div class="admin-container">
+
+    <!-- 統計 -->
+    <div class="stats-row">
+      <div class="stat-card pending">
+        <div class="stat-num" id="count-pending">0</div>
+        <div class="stat-label">待審核</div>
+      </div>
+      <div class="stat-card approved">
+        <div class="stat-num" id="count-approved">0</div>
+        <div class="stat-label">已核准</div>
+      </div>
+      <div class="stat-card rejected">
+        <div class="stat-num" id="count-rejected">0</div>
+        <div class="stat-label">已拒絕</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tab-bar">
+      <button class="admin-tab active" data-tab="pending">待審核</button>
+      <button class="admin-tab" data-tab="approved">已核准</button>
+      <button class="admin-tab" data-tab="rejected">已拒絕</button>
+    </div>
+
+    <!-- 列表 -->
+    <div id="report-list" class="report-list">
+      <div class="loading">載入中…</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 拒絕理由 Modal -->
+<div id="reject-modal" class="modal-overlay hidden">
+  <div class="reject-box">
+    <h3>拒絕原因（選填）</h3>
+    <textarea id="reject-reason" rows="3" placeholder="請輸入拒絕原因，將顯示給通報者…"></textarea>
+    <div class="reject-actions">
+      <button id="reject-cancel" class="btn-ghost">取消</button>
+      <button id="reject-confirm" class="btn-reject-confirm">確認拒絕</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="admin-toast hidden"></div>
+
+<script src="admin.js"></script>
+</body>
+</html>

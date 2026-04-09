@@ -572,7 +572,7 @@ async function submitReport() {
     const res  = await fetch(url, { method, body: fd });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || (isEdit ? '更新失敗' : '提交失敗'));
-    showToast(isEdit ? '✅ 通報已更新！' : '通報成功！感謝您的回報 🎉', 'success');
+    showToast(isEdit ? '✅ 通報已更新！待管理員重新審核' : '✅ 通報已送出！待管理員審核後將顯示於地圖', 'success');
     closeReportModal();
     await loadReports();
     if (selectedLat && selectedLng) mainMap.flyTo([selectedLat, selectedLng], 14);

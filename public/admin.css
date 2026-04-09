@@ -1,0 +1,313 @@
+:root {
+  --primary:   #2d6a4f;
+  --primary-dk:#1b4332;
+  --accent:    #f77f00;
+  --alive:     #22c55e;
+  --dead:      #ef4444;
+  --pending:   #f59e0b;
+  --approved:  #22c55e;
+  --rejected:  #ef4444;
+  --bg:        #f3f4f6;
+  --surface:   #ffffff;
+  --border:    #e5e7eb;
+  --text:      #111827;
+  --muted:     #6b7280;
+  --radius:    10px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, 'Noto Sans TC', 'PingFang TC', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ── HEADER ── */
+.admin-header {
+  background: var(--primary-dk);
+  padding: 0 24px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  position: sticky; top: 0; z-index: 100;
+}
+.admin-header-left { display: flex; align-items: center; gap: 12px; }
+.admin-logo { width: 40px; height: 30px; object-fit: contain; background: #fff; border-radius: 6px; padding: 2px 4px; }
+.admin-title { font-size: 16px; font-weight: 700; color: #fff; }
+.admin-sub   { font-size: 10px; color: #52b788; letter-spacing: 1px; }
+.admin-header-right { display: flex; align-items: center; gap: 10px; }
+#admin-user { display: flex; align-items: center; gap: 8px; }
+#admin-user img { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #52b788; }
+#admin-user span { font-size: 13px; color: #fff; }
+.btn-ghost {
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.25);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background .15s;
+}
+.btn-ghost:hover { background: rgba(255,255,255,.22); }
+
+/* ── CENTER SCREEN ── */
+.center-screen {
+  min-height: calc(100vh - 60px);
+  display: flex; align-items: center; justify-content: center;
+}
+.access-card {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 48px 40px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,.1);
+  max-width: 360px; width: 100%;
+}
+.access-icon { font-size: 56px; margin-bottom: 16px; }
+.access-card h2 { font-size: 22px; margin-bottom: 8px; }
+.access-card p  { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+.line-btn-admin {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: #06c755; color: #fff;
+  padding: 12px 22px; border-radius: 10px;
+  font-size: 15px; font-weight: 600;
+  text-decoration: none;
+  transition: background .15s;
+}
+.line-btn-admin:hover { background: #00b252; }
+
+/* ── MAIN ── */
+.admin-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px 60px;
+}
+
+/* ── STATS ── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: center;
+  border-left: 4px solid var(--border);
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+}
+.stat-card.pending  { border-color: var(--pending); }
+.stat-card.approved { border-color: var(--approved); }
+.stat-card.rejected { border-color: var(--rejected); }
+.stat-num   { font-size: 32px; font-weight: 700; color: var(--text); }
+.stat-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+/* ── TABS ── */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 4px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+}
+.admin-tab {
+  flex: 1;
+  padding: 9px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all .15s;
+}
+.admin-tab.active {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ── REPORT LIST ── */
+.report-list { display: flex; flex-direction: column; gap: 12px; }
+.loading, .empty { text-align: center; padding: 48px; color: var(--muted); font-size: 15px; }
+
+.report-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0;
+}
+
+/* 照片欄 */
+.card-photos {
+  width: 110px;
+  background: #f9fafb;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  align-content: start;
+}
+.card-photos img {
+  width: 100%; aspect-ratio: 1;
+  object-fit: cover;
+  cursor: pointer;
+}
+.card-photos img:first-child:last-child {
+  grid-column: span 2;
+}
+.no-photo {
+  grid-column: span 2;
+  display: flex; align-items: center; justify-content: center;
+  height: 80px;
+  font-size: 28px;
+  color: #d1d5db;
+}
+
+/* 資訊欄 */
+.card-info {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.card-species {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary-dk);
+}
+.card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.card-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.card-badge.alive   { background: #dcfce7; color: #14532d; }
+.card-badge.injured { background: #ffedd5; color: #7c2d12; }
+.card-badge.dead    { background: #fee2e2; color: #7f1d1d; }
+.card-badge.unknown { background: #f1f5f9; color: #334155; }
+.card-desc {
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card-reporter { font-size: 12px; color: var(--muted); }
+.card-reject-reason {
+  font-size: 12px;
+  color: var(--rejected);
+  background: #fef2f2;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border-left: 3px solid var(--rejected);
+}
+
+/* 操作欄 */
+.card-actions {
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: center;
+  min-width: 90px;
+}
+.btn-approve, .btn-reject, .btn-undo {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.btn-approve { background: #dcfce7; color: #14532d; }
+.btn-approve:hover { background: var(--approved); color: #fff; }
+.btn-reject  { background: #fee2e2; color: #7f1d1d; }
+.btn-reject:hover  { background: var(--rejected);  color: #fff; }
+.btn-undo    { background: #f3f4f6; color: var(--muted); }
+.btn-undo:hover    { background: #e5e7eb; }
+
+/* ── REJECT MODAL ── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(3px);
+}
+.reject-box {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 28px;
+  width: 100%; max-width: 400px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.2);
+}
+.reject-box h3 { font-size: 17px; margin-bottom: 14px; }
+.reject-box textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+}
+.reject-box textarea:focus { border-color: var(--rejected); }
+.reject-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.btn-reject-confirm {
+  background: var(--rejected); color: #fff;
+  border: none; border-radius: 8px;
+  padding: 9px 18px; font-size: 14px; font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── TOAST ── */
+.admin-toast {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%);
+  background: #111827; color: #fff;
+  padding: 11px 22px;
+  border-radius: 999px;
+  font-size: 14px;
+  z-index: 9999;
+  box-shadow: 0 4px 16px rgba(0,0,0,.3);
+}
+.admin-toast.success { background: var(--primary); }
+.admin-toast.error   { background: var(--rejected); }
+
+.hidden { display: none !important; }
+
+@media (max-width: 600px) {
+  .report-card { grid-template-columns: 1fr; }
+  .card-photos { width: 100%; grid-template-columns: repeat(4, 1fr); }
+  .card-actions { flex-direction: row; border-top: 1px solid var(--border); }
+  .stats-row { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stat-card { padding: 14px 8px; }
+  .stat-num  { font-size: 24px; }
+}

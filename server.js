@@ -64,6 +64,19 @@ const requireAuth = (req, res, next) => {
   next();
 };
 
+// ── 管理員判斷 ────────────────────────────────────────────
+function isAdmin(user) {
+  if (!user) return false;
+  const ids = (process.env.ADMIN_LINE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+  return ids.includes(user.lineId);
+}
+const requireAdmin = (req, res, next) => {
+  const user = getUser(req);
+  if (!user)        return res.status(401).json({ error: '請先登入' });
+  if (!isAdmin(user)) return res.status(403).json({ error: '權限不足' });
+  next();
+};
+
 // ── LINE OAuth ────────────────────────────────────────────
 const LINE_CLIENT_ID     = process.env.LINE_CLIENT_ID;
 const LINE_CLIENT_SECRET = process.env.LINE_CLIENT_SECRET;
@@ -148,12 +161,39 @@ app.post('/auth/logout', (req, res) => {
 // ── 通報 API ──────────────────────────────────────────────
 app.get('/api/reports', async (req, res) => {
   const { species } = req.query;
-  let query = supabase.from('reports').select('*').order('created_at', { ascending: false });
+  let query = supabase.from('reports').select('*')
+    .eq('review_status', 'approved')          // 只顯示已核准
+    .order('created_at', { ascending: false });
   if (species) query = query.ilike('species', `%${species}%`);
-
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
+});
+
+// ── 後台 API ──────────────────────────────────────────────
+app.get('/admin/api/reports', requireAdmin, async (req, res) => {
+  const { tab } = req.query; // pending | approved | rejected
+  let query = supabase.from('reports').select('*').order('created_at', { ascending: false });
+  if (tab && tab !== 'all') query = query.eq('review_status', tab);
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.get('/admin/api/me', (req, res) => {
+  const user = getUser(req);
+  res.json({ user: user || null, isAdmin: isAdmin(user) });
+});
+
+app.put('/admin/api/reports/:id/review', requireAdmin, async (req, res) => {
+  const { action, reason } = req.body;
+  if (!['approve','reject'].includes(action)) return res.status(400).json({ error: '無效操作' });
+  const review_status = action === 'approve' ? 'approved' : 'rejected';
+  const { error } = await supabase.from('reports')
+    .update({ review_status, reject_reason: reason || null })
+    .eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
 });
 
 app.get('/api/reports/:id', async (req, res) => {
