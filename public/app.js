@@ -48,10 +48,13 @@ let miniMapReady = false;
 // ── 啟動 ────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   initMainMap();
-  await checkAuth();
-  await loadReports();
-  bindEvents();
+  bindEvents();       // 先綁事件，確保按鈕一定有反應
   checkUrlError();
+  await checkAuth();
+  await loadReports().catch(err => {
+    console.error('載入通報失敗:', err);
+    showToast('資料載入失敗，請重新整理', 'error');
+  });
 });
 
 // ── 認證 ─────────────────────────────────────────────────

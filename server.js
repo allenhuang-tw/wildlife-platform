@@ -5,6 +5,7 @@ const multer  = require('multer');
 const axios   = require('axios');
 const path    = require('path');
 const crypto  = require('crypto');
+const cookieParser = require('cookie-parser');
 const { createClient } = require('@supabase/supabase-js');
 
 const app  = express();
@@ -28,6 +29,7 @@ const upload = multer({
 // ── 中介層 ────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser(process.env.SESSION_SECRET || 'dev-secret'));
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-secret',
   resave: false,
@@ -54,7 +56,12 @@ app.get('/auth/line', (req, res) => {
     return res.send('<h2>請在環境變數設定 LINE_CLIENT_ID 與 LINE_CLIENT_SECRET</h2>');
   }
   const state = crypto.randomBytes(16).toString('hex');
-  req.session.oauthState = state;
+  // 用簽名 cookie 取代 session，避免 server 重啟後 state 消失
+  res.cookie('oauth_state', state, {
+    httpOnly: true, sameSite: 'lax',
+    maxAge: 5 * 60 * 1000, // 5 分鐘有效
+    secure: process.env.NODE_ENV === 'production',
+  });
   const url =
     `https://access.line.me/oauth2/v2.1/authorize?response_type=code` +
     `&client_id=${LINE_CLIENT_ID}` +
@@ -66,7 +73,9 @@ app.get('/auth/line', (req, res) => {
 app.get('/auth/line/callback', async (req, res) => {
   const { code, state, error } = req.query;
   if (error) return res.redirect(`/?error=${error}`);
-  if (state !== req.session.oauthState) return res.redirect('/?error=invalid_state');
+  const savedState = req.cookies.oauth_state;
+  res.clearCookie('oauth_state');
+  if (!savedState || state !== savedState) return res.redirect('/?error=invalid_state');
 
   try {
     const tokenRes = await axios.post(
