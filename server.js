@@ -289,6 +289,37 @@ async function sendLineNotify(lineId, species, action, reason) {
   );
 }
 
+// ── 批量審核 ──────────────────────────────────────────────
+app.put('/admin/api/reports/bulk-review', requireAdmin, async (req, res) => {
+  const { ids, action, reason } = req.body;
+  if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: '請選擇通報' });
+  if (!['approve', 'reject'].includes(action)) return res.status(400).json({ error: '無效操作' });
+
+  const review_status = action === 'approve' ? 'approved' : 'rejected';
+
+  // 先取通報者資訊（LINE 推播用）
+  const { data: reports } = await supabase
+    .from('reports').select('id, species, users(line_id)')
+    .in('id', ids);
+
+  const { error } = await supabase.from('reports')
+    .update({ review_status, reject_reason: reason || null })
+    .in('id', ids);
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  // 發送 LINE 通知（非同步，不阻塞回應）
+  if (process.env.LINE_MESSAGING_TOKEN && reports) {
+    Promise.allSettled(
+      reports
+        .filter(r => r.users?.line_id)
+        .map(r => sendLineNotify(r.users.line_id, r.species, action, reason))
+    ).catch(() => {});
+  }
+
+  res.json({ success: true, count: ids.length });
+});
+
 app.get('/api/reports/:id', async (req, res) => {
   const { data, error } = await supabase
     .from('reports')

@@ -26,6 +26,8 @@ function safeImgs(raw) {
 
 let currentTab = 'pending';
 let pendingRejectId = null;
+let pendingBulkReject = false;
+let selectedIds = new Set();
 let allCounts = { pending: 0, approved: 0, rejected: 0 };
 
 document.addEventListener('DOMContentLoaded', init);
@@ -66,6 +68,7 @@ function bindEvents() {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.admin-tab').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
+      clearSelection();
       currentTab = btn.dataset.tab;
       renderReports();
     });
@@ -89,12 +92,16 @@ function bindEvents() {
     }
   });
   document.getElementById('reject-confirm').addEventListener('click', async () => {
-    if (!pendingRejectId) return;
     const reason = document.getElementById('reject-reason').value.trim();
-    await doReview(pendingRejectId, 'reject', reason);
     document.getElementById('reject-modal').classList.add('hidden');
     document.getElementById('reject-reason').value = '';
-    pendingRejectId = null;
+    if (pendingBulkReject) {
+      pendingBulkReject = false;
+      await doBulkReview('reject', reason);
+    } else if (pendingRejectId) {
+      await doReview(pendingRejectId, 'reject', reason);
+      pendingRejectId = null;
+    }
   });
 }
 
@@ -124,13 +131,15 @@ function renderReports() {
     return;
   }
 
+  const isPending = currentTab === 'pending';
+
   list.innerHTML = reports.map(r => {
     const imgs   = safeImgs(r.image_paths);
     const photos = imgs.length
       ? imgs.slice(0, 4).map(u => `<img src="${u}" alt="" onclick="window.open('${u}')">`).join('')
       : `<div class="no-photo">📷</div>`;
 
-    const actions = currentTab === 'pending'
+    const actions = isPending
       ? `<button class="btn-approve" onclick="approve(${r.id})">✅ 核准</button>
          <button class="btn-reject"  onclick="openReject(${r.id})">❌ 拒絕</button>`
       : currentTab === 'approved'
@@ -140,8 +149,18 @@ function renderReports() {
     const rejectReason = r.reject_reason
       ? `<div class="card-reject-reason">拒絕原因：${r.reject_reason}</div>` : '';
 
+    const checkCol = isPending
+      ? `<div class="card-check-col">
+           <input type="checkbox" class="card-checkbox" data-id="${r.id}"
+             onchange="toggleSelect(${r.id}, this.checked)"
+             ${selectedIds.has(r.id) ? 'checked' : ''} />
+         </div>` : '';
+
+    const selected = selectedIds.has(r.id) ? ' selected' : '';
+
     return `
-      <div class="report-card" id="card-${r.id}">
+      <div class="report-card${isPending ? ' has-check' : ''}${selected}" id="card-${r.id}">
+        ${checkCol}
         <div class="card-photos">${photos}</div>
         <div class="card-info">
           <div class="card-species">${getEmoji(r.species)} ${r.species}</div>
@@ -167,7 +186,9 @@ async function approve(id) {
 }
 
 function openReject(id) {
-  pendingRejectId = id;
+  pendingRejectId   = id;
+  pendingBulkReject = false;
+  document.getElementById('reject-modal-title').textContent = '拒絕原因（選填）';
   document.getElementById('reject-reason').value = '';
   document.getElementById('reject-modal').classList.remove('hidden');
   document.getElementById('reject-reason').focus();
@@ -194,6 +215,98 @@ async function doReview(id, action, reason = '') {
   await loadAll();
 }
 
+// ── 批量選取 ──────────────────────────────────────────────
+function toggleSelect(id, checked) {
+  checked ? selectedIds.add(id) : selectedIds.delete(id);
+  const card = document.getElementById(`card-${id}`);
+  if (card) card.classList.toggle('selected', checked);
+  updateBulkToolbar();
+}
+
+function toggleSelectAll(checked) {
+  document.querySelectorAll('.card-checkbox').forEach(cb => {
+    const id = parseInt(cb.dataset.id);
+    cb.checked = checked;
+    checked ? selectedIds.add(id) : selectedIds.delete(id);
+    const card = document.getElementById(`card-${id}`);
+    if (card) card.classList.toggle('selected', checked);
+  });
+  updateBulkToolbar();
+}
+
+function updateBulkToolbar() {
+  const toolbar = document.getElementById('bulk-toolbar');
+  const n = selectedIds.size;
+  if (currentTab === 'pending' && n > 0) {
+    toolbar.classList.remove('hidden');
+    document.getElementById('bulk-count').textContent = `已選 ${n} 筆`;
+  } else {
+    toolbar.classList.add('hidden');
+  }
+  const allCb = document.getElementById('select-all-check');
+  const total  = document.querySelectorAll('.card-checkbox').length;
+  if (allCb) {
+    allCb.checked       = n > 0 && n === total;
+    allCb.indeterminate = n > 0 && n < total;
+  }
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  document.querySelectorAll('.card-checkbox').forEach(cb => { cb.checked = false; });
+  document.querySelectorAll('.report-card.selected').forEach(c => c.classList.remove('selected'));
+  const toolbar = document.getElementById('bulk-toolbar');
+  if (toolbar) toolbar.classList.add('hidden');
+  const allCb = document.getElementById('select-all-check');
+  if (allCb) { allCb.checked = false; allCb.indeterminate = false; }
+}
+
+async function bulkApprove() {
+  if (!selectedIds.size) return;
+  const ids = [...selectedIds];
+  const btn = document.querySelector('.btn-bulk-approve');
+  btn.textContent = '處理中…'; btn.disabled = true;
+  const res  = await fetch('/admin/api/reports/bulk-review', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids, action: 'approve' }),
+  });
+  const data = await res.json();
+  btn.textContent = '✅ 批量核准'; btn.disabled = false;
+  if (!res.ok) { showToast(data.error || '操作失敗', 'error'); return; }
+  showToast(`✅ 已核准 ${data.count} 筆通報`, 'success');
+  clearSelection();
+  await loadAll();
+}
+
+function openBulkReject() {
+  if (!selectedIds.size) return;
+  pendingBulkReject = true;
+  pendingRejectId   = null;
+  document.getElementById('reject-modal-title').textContent = `批量拒絕 ${selectedIds.size} 筆（原因選填）`;
+  document.getElementById('reject-reason').value = '';
+  document.getElementById('reject-modal').classList.remove('hidden');
+  document.getElementById('reject-reason').focus();
+}
+
+async function doBulkReview(action, reason) {
+  const ids = [...selectedIds];
+  const res  = await fetch('/admin/api/reports/bulk-review', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids, action, reason }),
+  });
+  const data = await res.json();
+  if (!res.ok) { showToast(data.error || '操作失敗', 'error'); return; }
+  showToast(
+    `${action === 'approve' ? '✅ 已核准' : '❌ 已拒絕'} ${data.count} 筆通報`,
+    action === 'approve' ? 'success' : ''
+  );
+  clearSelection();
+  await loadAll();
+}
+
+// ── Toast ──────────────────────────────────────────────────
 let toastTimer;
 function showToast(msg, type = '') {
   const el = document.getElementById('toast');

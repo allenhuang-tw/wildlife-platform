@@ -67,6 +67,18 @@
       <button class="admin-tab" data-tab="rejected">已拒絕</button>
     </div>
 
+    <!-- 批量操作工具列 -->
+    <div id="bulk-toolbar" class="bulk-toolbar hidden">
+      <label class="bulk-select-all">
+        <input type="checkbox" id="select-all-check" onchange="toggleSelectAll(this.checked)" />
+        <span id="bulk-count">已選 0 筆</span>
+      </label>
+      <div class="bulk-btns">
+        <button class="btn-bulk-approve" onclick="bulkApprove()">✅ 批量核准</button>
+        <button class="btn-bulk-reject"  onclick="openBulkReject()">❌ 批量拒絕</button>
+      </div>
+    </div>
+
     <!-- 列表 -->
     <div id="report-list" class="report-list">
       <div class="loading">載入中…</div>
@@ -78,7 +90,7 @@
 <!-- 拒絕理由 Modal -->
 <div id="reject-modal" class="modal-overlay hidden">
   <div class="reject-box">
-    <h3>拒絕原因（選填）</h3>
+    <h3 id="reject-modal-title">拒絕原因（選填）</h3>
     <textarea id="reject-reason" rows="3" placeholder="請輸入拒絕原因，將顯示給通報者…"></textarea>
     <div class="reject-actions">
       <button id="reject-cancel" class="btn-ghost">取消</button>
