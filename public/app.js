@@ -982,8 +982,8 @@ async function openDetailModal(id) {
     ownerActions.classList.add('hidden');
   }
 
-  // 分享按鈕
-  document.getElementById('share-report-btn').onclick = () => shareReport(r.id, r.species);
+  // 分享按鈕（傳整筆通報資料以組完整描述）
+  document.getElementById('share-report-btn').onclick = () => shareReport(r);
 
   // 更新網址列，方便書籤 / 直接分享
   history.pushState({ reportId: id }, '', `/?report=${id}`);
@@ -992,16 +992,37 @@ async function openDetailModal(id) {
 }
 
 // ── 分享通報 ──────────────────────────────────────────────
-function shareReport(reportId, species) {
-  const url  = `${location.origin}/?report=${reportId}`;
-  const text = `發現了一筆 ${species} 的野生動物通報！`;
+function shareReport(r) {
+  const url         = `${location.origin}/?report=${r.id}`;
+  const emoji       = getEmoji(r.species);
+  const statusLabel = STATUS_LABELS[r.status] || r.status;
+  const addr        = r.address || `${Number(r.lat).toFixed(4)}, ${Number(r.lng).toFixed(4)}`;
+
+  // 組分享文字
+  const lines = [`${emoji} ${r.species}　狀態：${statusLabel}`];
+  if (r.quantity > 1) lines.push(`數量：${r.quantity} 隻`);
+  lines.push(`📍 ${addr}`);
+  if (r.description) {
+    const desc = r.description.length > 100
+      ? r.description.slice(0, 100) + '…'
+      : r.description;
+    lines.push(`📝 ${desc}`);
+  }
+  lines.push('');
+  lines.push('🌿 台灣野生動物通報平台');
+
+  const shareText = lines.join('\n');
+  const title     = `${emoji} ${r.species} — 野生動物通報`;
 
   if (navigator.share) {
-    navigator.share({ title: `野生動物通報：${species}`, text, url }).catch(() => {});
+    // 手機原生分享：文字 + 連結分開，讓 LINE 等 App 各自處理
+    navigator.share({ title, text: shareText, url }).catch(() => {});
   } else {
-    navigator.clipboard.writeText(url)
-      .then(() => showToast('🔗 分享連結已複製！', 'success'))
-      .catch(() => { prompt('複製此連結：', url); });
+    // 桌機：文字與連結一起複製到剪貼簿
+    const full = `${shareText}\n${url}`;
+    navigator.clipboard.writeText(full)
+      .then(() => showToast('🔗 分享內容已複製！', 'success'))
+      .catch(() => { prompt('複製此分享內容：', full); });
   }
 }
 
