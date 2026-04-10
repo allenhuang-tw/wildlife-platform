@@ -751,6 +751,28 @@ textarea { resize: vertical; width: 100%; }
 }
 .popup-open:hover { background: var(--primary-dark); }
 
+/* 物種百科連結 — popup 版 */
+.popup-wiki-link {
+  font-size: 13px;
+  text-decoration: none;
+  opacity: .7;
+  transition: opacity .15s;
+  margin-left: 4px;
+}
+.popup-wiki-link:hover { opacity: 1; }
+
+/* 物種百科連結 — 詳情 modal 版 */
+.wiki-link {
+  font-size: 14px;
+  text-decoration: none;
+  opacity: .65;
+  margin-left: 6px;
+  vertical-align: middle;
+  transition: opacity .15s, transform .15s;
+  display: inline-block;
+}
+.wiki-link:hover { opacity: 1; transform: scale(1.2); }
+
 /* ── UTILITIES ───────────────────────────────── */
 .hidden { display: none !important; }
 

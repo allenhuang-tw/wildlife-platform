@@ -30,6 +30,11 @@ function getEmoji(species) {
 const STATUS_LABELS = { alive:'存活', injured:'受傷', dead:'死亡', unknown:'不確定' };
 const STATUS_COLORS = { alive:'#22c55e', injured:'#f97316', dead:'#ef4444', unknown:'#94a3b8' };
 
+// 台灣生物多樣性網絡 (TBN) 物種搜尋連結
+function speciesWikiUrl(species) {
+  return `https://www.tbn.org.tw/search?q=${encodeURIComponent(species)}`;
+}
+
 function escapeHtml(str) {
   return String(str)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -253,12 +258,16 @@ function makePopupHtml(r) {
   const color = STATUS_COLORS[r.status] || STATUS_COLORS.unknown;
   return `
     <div class="popup-inner">
-      <div class="popup-species">${getEmoji(r.species)} ${r.species}</div>
+      <div class="popup-species">
+        ${getEmoji(r.species)} ${escapeHtml(r.species)}
+        <a href="${speciesWikiUrl(r.species)}" target="_blank" rel="noopener noreferrer"
+           class="popup-wiki-link" title="查詢物種百科">📖</a>
+      </div>
       <div class="popup-meta">
         數量：${r.quantity} 隻 ・
         <span style="color:${color};font-weight:600">${statusLabel}</span>
       </div>
-      ${r.address ? `<div class="popup-meta">📍 ${r.address}</div>` : ''}
+      ${r.address ? `<div class="popup-meta">📍 ${escapeHtml(r.address)}</div>` : ''}
       <div class="popup-meta">${formatDate(r.created_at)}</div>
     </div>
     <button class="popup-open" id="popup-open-${r.id}">查看詳情 →</button>
@@ -928,7 +937,11 @@ async function openDetailModal(id) {
     <div class="detail-meta">
       <div class="detail-row">
         <span class="detail-label">物種</span>
-        <span class="detail-value">${escapeHtml(r.species)}</span>
+        <span class="detail-value">
+          ${escapeHtml(r.species)}
+          <a href="${speciesWikiUrl(r.species)}" target="_blank" rel="noopener noreferrer"
+             class="wiki-link" title="查詢台灣生物多樣性資料庫">📖</a>
+        </span>
       </div>
       <div class="detail-row">
         <span class="detail-label">數量</span>
