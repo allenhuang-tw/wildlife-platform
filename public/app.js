@@ -37,6 +37,78 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// ── PWA 安裝 Banner ─────────────────────────────────────
+let deferredInstallPrompt = null;
+
+// Android / Chrome：攔截安裝事件
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  // 若使用者之前沒有關掉過，5 秒後顯示
+  if (!localStorage.getItem('pwa-banner-dismissed')) {
+    setTimeout(showInstallBanner, 5000);
+  }
+});
+
+// iOS Safari 偵測（不支援 beforeinstallprompt）
+function isIosSafari() {
+  const ua = navigator.userAgent;
+  return /iphone|ipad|ipod/i.test(ua) && /safari/i.test(ua) && !/crios|fxios|opios/i.test(ua);
+}
+
+function isStandalone() {
+  return window.navigator.standalone === true ||
+         window.matchMedia('(display-mode: standalone)').matches;
+}
+
+function showInstallBanner() {
+  const banner = document.getElementById('install-banner');
+  if (!banner || isStandalone()) return;
+  banner.classList.remove('hidden');
+}
+
+function showIosBanner() {
+  const banner = document.getElementById('install-banner');
+  if (!banner) return;
+  banner.classList.add('ios-hint');
+  banner.classList.remove('hidden');
+  document.getElementById('install-banner-sub').textContent = '請依下列步驟加入主畫面';
+  // 插入步驟說明
+  if (!document.getElementById('ios-steps')) {
+    const steps = document.createElement('div');
+    steps.id = 'ios-steps';
+    steps.className = 'ios-steps';
+    steps.innerHTML = '1. 點選底部 <strong>分享</strong> 按鈕 ⎋<br>2. 選擇「<strong>加入主畫面</strong>」<br>3. 點「<strong>新增</strong>」即完成';
+    banner.appendChild(steps);
+  }
+}
+
+// 安裝按鈕點擊（Android）
+document.addEventListener('DOMContentLoaded', () => {
+  const installBtn   = document.getElementById('install-banner-btn');
+  const installClose = document.getElementById('install-banner-close');
+  const banner       = document.getElementById('install-banner');
+
+  installBtn && installBtn.addEventListener('click', async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    banner.classList.add('hidden');
+    if (outcome === 'accepted') localStorage.setItem('pwa-banner-dismissed', '1');
+  });
+
+  installClose && installClose.addEventListener('click', () => {
+    banner.classList.add('hidden');
+    localStorage.setItem('pwa-banner-dismissed', '1');
+  });
+
+  // iOS：若是 iOS Safari 且未安裝，3 秒後顯示說明 banner
+  if (isIosSafari() && !isStandalone() && !localStorage.getItem('pwa-banner-dismissed')) {
+    setTimeout(showIosBanner, 3000);
+  }
+});
+
 // ── 全域狀態 ────────────────────────────────────────────
 let mainMap, miniMapMap, addrMap, gpsMap;
 let markersLayer;
