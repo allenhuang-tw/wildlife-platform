@@ -27,14 +27,19 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html {
+  height: 100%;
+  height: 100dvh;
+}
+
 body {
   font-family: -apple-system, 'Noto Sans TC', 'PingFang TC', sans-serif;
   background: var(--bg);
   color: var(--text);
   overflow: hidden;
-  height: 100vh;          /* Safari 舊版 fallback */
-  height: 100dvh;         /* 現代瀏覽器（含 Chrome、Safari 16+）*/
-  height: -webkit-fill-available; /* iOS Safari 精確高度 */
+  height: 100%;           /* 撐滿 html（所有瀏覽器） */
+  height: 100vh;          /* 覆蓋：標準 */
+  height: 100dvh;         /* 覆蓋：動態視口（Safari 15.4+ / Chrome 108+）*/
   display: flex;
   flex-direction: column;
 }
