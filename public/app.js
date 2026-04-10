@@ -243,7 +243,7 @@ function makePopupHtml(r) {
 // ── 事件綁定 ──────────────────────────────────────────────
 function bindEvents() {
   // Header auth
-  document.getElementById('line-login-btn').addEventListener('click', () => window.location.href = '/auth/line');
+  document.getElementById('line-login-btn').addEventListener('click', lineLogin);
   document.getElementById('logout-btn').addEventListener('click', async () => {
     await fetch('/auth/logout', { method: 'POST' });
     currentUser = null;
@@ -393,7 +393,7 @@ function bindEvents() {
   });
 
   // Login prompt
-  document.getElementById('login-prompt-btn').addEventListener('click', () => window.location.href = '/auth/line');
+  document.getElementById('login-prompt-btn').addEventListener('click', lineLogin);
   document.getElementById('login-prompt-cancel').addEventListener('click', () => {
     document.getElementById('login-prompt').classList.add('hidden');
   });
@@ -749,6 +749,39 @@ function openSuccessModal(species, isEdit) {
 
 function closeSuccessModal() {
   document.getElementById('success-modal').classList.add('hidden');
+}
+
+// ── LINE 登入（含冷啟動喚醒）────────────────────────────────
+async function lineLogin() {
+  const btn = document.getElementById('line-login-btn');
+  const promptBtn = document.getElementById('login-prompt-btn');
+  const origText = btn ? btn.innerHTML : '';
+
+  function setLoading(loading) {
+    if (btn) {
+      btn.disabled = loading;
+      btn.innerHTML = loading ? '<span>連線中…</span>' : origText;
+    }
+    if (promptBtn) promptBtn.disabled = loading;
+  }
+
+  try {
+    setLoading(true);
+    // 先確認伺服器已醒來（最多等 20 秒）
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 20000);
+    const res = await fetch('/auth/user', { signal: ctrl.signal });
+    clearTimeout(tid);
+    if (!res.ok && res.status === 503) {
+      // 再等一秒後直接跳，讓 LINE 那邊也給時間
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  } catch {
+    // 超時或失敗 — 還是嘗試跳轉，讓伺服器繼續醒
+  } finally {
+    setLoading(false);
+  }
+  window.location.href = '/auth/line';
 }
 
 // ── 詳情 Modal ────────────────────────────────────────────
