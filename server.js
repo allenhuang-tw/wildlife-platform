@@ -220,13 +220,22 @@ app.put('/admin/api/reports/:id/review', requireAdmin, async (req, res) => {
   if (!['approve','reject'].includes(action)) return res.status(400).json({ error: '無效操作' });
   const review_status = action === 'approve' ? 'approved' : 'rejected';
 
-  // 取得通報資訊（含通報者 LINE ID）
+  // 取得通報資訊（含圖片路徑與通報者 LINE ID）
   const { data: report } = await supabase
     .from('reports').select('*, users(line_id, display_name)')
     .eq('id', req.params.id).single();
 
+  const updatePayload = { review_status, reject_reason: reason || null };
+
+  // 拒絕時刪除 Storage 圖片並清空 image_paths
+  if (action === 'reject') {
+    const imgs = Array.isArray(report?.image_paths) ? report.image_paths : [];
+    await deleteStorageImages(imgs);
+    updatePayload.image_paths = [];
+  }
+
   const { error } = await supabase.from('reports')
-    .update({ review_status, reject_reason: reason || null })
+    .update(updatePayload)
     .eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
 
@@ -238,6 +247,21 @@ app.put('/admin/api/reports/:id/review', requireAdmin, async (req, res) => {
 
   res.json({ success: true });
 });
+
+// 從 Supabase 公開 URL 萃取 bucket 內的相對路徑，並刪除檔案
+async function deleteStorageImages(imagePaths) {
+  if (!Array.isArray(imagePaths) || !imagePaths.length) return;
+  const paths = imagePaths
+    .map(url => {
+      // URL 格式：.../storage/v1/object/public/wildlife-images/<path>
+      const m = String(url).match(/\/wildlife-images\/(.+)$/);
+      return m ? m[1] : null;
+    })
+    .filter(Boolean);
+  if (!paths.length) return;
+  const { error } = await supabase.storage.from('wildlife-images').remove(paths);
+  if (error) console.error('Storage 圖片刪除失敗:', error.message);
+}
 
 async function sendLineNotify(lineId, species, action, reason) {
   const SITE = process.env.LINE_REDIRECT_URI?.replace('/auth/line/callback', '') || 'https://wildlife-platform.onrender.com';
@@ -297,13 +321,24 @@ app.put('/admin/api/reports/bulk-review', requireAdmin, async (req, res) => {
 
   const review_status = action === 'approve' ? 'approved' : 'rejected';
 
-  // 先取通報者資訊（LINE 推播用）
+  // 先取通報資訊（圖片路徑 + LINE ID）
   const { data: reports } = await supabase
-    .from('reports').select('id, species, users(line_id)')
+    .from('reports').select('id, species, image_paths, users(line_id)')
     .in('id', ids);
 
+  const updatePayload = { review_status, reject_reason: reason || null };
+
+  // 拒絕時刪除所有 Storage 圖片並清空 image_paths
+  if (action === 'reject' && reports) {
+    const allImgs = reports.flatMap(r =>
+      Array.isArray(r.image_paths) ? r.image_paths : []
+    );
+    await deleteStorageImages(allImgs);
+    updatePayload.image_paths = [];
+  }
+
   const { error } = await supabase.from('reports')
-    .update({ review_status, reject_reason: reason || null })
+    .update(updatePayload)
     .in('id', ids);
 
   if (error) return res.status(500).json({ error: error.message });
