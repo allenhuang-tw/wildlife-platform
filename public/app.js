@@ -661,12 +661,78 @@ async function reverseGeocode(lat, lng) {
 }
 
 // ── 照片 ──────────────────────────────────────────────────
-function addPhotos(files) {
-  const allowed = files.filter(f => f.type.startsWith('image/'));
-  const remaining = 5 - photoFiles.length;
-  const toAdd = allowed.slice(0, remaining);
+
+// Canvas 壓縮：最長邊 ≤ 1920px，JPEG 品質 0.82
+// 小於 300 KB 的直接略過；不支援的格式（如舊版 HEIC）傳原檔
+function compressImage(file) {
+  const MAX_PX   = 1920;
+  const QUALITY  = 0.82;
+  const MIN_SIZE = 300 * 1024; // 300 KB 以下不壓縮
+
+  if (file.size < MIN_SIZE) return Promise.resolve(file);
+
+  return new Promise(resolve => {
+    const img = new Image();
+    const blobUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(blobUrl);
+      let { naturalWidth: w, naturalHeight: h } = img;
+
+      // 縮小尺寸
+      if (w > MAX_PX || h > MAX_PX) {
+        if (w >= h) { h = Math.round(h * MAX_PX / w); w = MAX_PX; }
+        else        { w = Math.round(w * MAX_PX / h); h = MAX_PX; }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width  = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+
+      const outName = file.name.replace(/\.[^.]+$/, '.jpg');
+      canvas.toBlob(
+        blob => resolve(blob ? new File([blob], outName, { type: 'image/jpeg' }) : file),
+        'image/jpeg', QUALITY
+      );
+    };
+
+    img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(file); };
+    img.src = blobUrl;
+  });
+}
+
+function fmtSize(bytes) {
+  return bytes < 1024 * 1024
+    ? `${Math.round(bytes / 1024)} KB`
+    : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+const PLACEHOLDER_HTML = `
+  <span class="upload-icon">📸</span>
+  <p>點擊或拖曳照片至此</p>
+  <small>JPG・PNG・HEIC・最大 15MB／張</small>`;
+
+async function addPhotos(files) {
+  const allowed   = files.filter(f => f.type.startsWith('image/') || /\.(heic|heif)$/i.test(f.name));
+  const remaining = 5 - photoFiles.length - keepImages.length;
+  const toAdd     = allowed.slice(0, remaining);
   if (!toAdd.length) return;
-  photoFiles.push(...toAdd);
+
+  const placeholder = document.getElementById('upload-placeholder');
+  placeholder.style.display = ''; // 壓縮期間保持可見
+
+  const compressed = [];
+  for (let i = 0; i < toAdd.length; i++) {
+    placeholder.innerHTML = `
+      <span class="upload-icon">⏳</span>
+      <p>壓縮中… ${i + 1}／${toAdd.length}</p>
+      <small>${toAdd[i].name}</small>`;
+    compressed.push(await compressImage(toAdd[i]));
+  }
+
+  placeholder.innerHTML = PLACEHOLDER_HTML;
+  photoFiles.push(...compressed);
   renderPhotoPreview();
 }
 
@@ -676,12 +742,14 @@ function renderPhotoPreview() {
   grid.innerHTML = '';
 
   photoFiles.forEach((file, i) => {
-    const url = URL.createObjectURL(file);
+    const url  = URL.createObjectURL(file);
+    const size = fmtSize(file.size);
     const thumb = document.createElement('div');
     thumb.className = 'photo-thumb';
     thumb.innerHTML = `
       <img src="${url}" alt="" />
       <button class="photo-remove" data-index="${i}">✕</button>
+      <span class="photo-size">${size}</span>
     `;
     thumb.querySelector('.photo-remove').addEventListener('click', e => {
       e.stopPropagation();

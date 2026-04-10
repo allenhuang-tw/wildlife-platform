@@ -551,6 +551,18 @@ textarea { resize: vertical; width: 100%; }
   display: flex; align-items: center; justify-content: center;
   z-index: 2;
 }
+.photo-size {
+  position: absolute;
+  bottom: 3px; left: 3px;
+  background: rgba(0,0,0,.55);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  border-radius: 3px;
+  padding: 1px 4px;
+  pointer-events: none;
+  z-index: 2;
+}
 
 /* ── DETAIL MODAL ─────────────────────────────── */
 .detail-box { max-width: 560px; }
