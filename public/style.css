@@ -975,6 +975,131 @@ button, input, select, textarea {
 /* Leaflet fix inside modal */
 .leaflet-container { font-family: inherit; }
 
+/* ── SUCCESS MODAL ───────────────────────── */
+.success-box {
+  max-width: 420px;
+  overflow: visible;
+  position: relative;
+}
+.success-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+  background: rgba(0,0,0,.1);
+  color: var(--text-muted);
+}
+.success-body {
+  padding: 36px 24px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+/* 動畫圈圈 */
+.success-anim { margin-bottom: 4px; }
+.success-circle {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary-light), var(--primary));
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 24px rgba(45,106,79,.35);
+  animation: popIn .4s cubic-bezier(.175,.885,.32,1.275) both;
+}
+@keyframes popIn {
+  from { opacity: 0; transform: scale(.4); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.success-check {
+  color: #fff;
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+  animation: checkDraw .3s ease .3s both;
+}
+@keyframes checkDraw {
+  from { opacity: 0; transform: scale(.5); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.success-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--primary-dark);
+}
+.success-species {
+  font-size: 15px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 6px 14px;
+}
+.success-hint {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* 進度步驟 */
+.success-steps {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 14px 12px;
+  width: 100%;
+  justify-content: center;
+  flex-wrap: nowrap;
+}
+.success-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 48px;
+}
+.step-icon  { font-size: 20px; line-height: 1; }
+.step-label { font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+.success-step.done .step-icon  { filter: drop-shadow(0 0 4px rgba(34,197,94,.5)); }
+.success-step.done .step-label { color: var(--primary); font-weight: 700; }
+.success-step-arrow { color: var(--border); font-size: 18px; flex-shrink: 0; }
+
+.success-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin-top: 4px;
+}
+.success-actions .btn-primary { flex: 1; padding: 11px 16px; }
+.btn-outline-dark {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 11px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s;
+}
+.btn-outline-dark:hover { background: var(--bg); }
+
+@media (max-width: 600px) {
+  .success-box {
+    border-radius: var(--radius) var(--radius) 0 0;
+    max-width: 100%;
+  }
+  .success-body { padding: 32px 18px calc(20px + env(safe-area-inset-bottom)); }
+  .success-actions { flex-direction: column-reverse; }
+  .success-actions .btn-primary,
+  .success-actions .btn-outline-dark { width: 100%; text-align: center; }
+  .step-label { font-size: 9px; }
+}
+
 /* ── INSTALL BANNER ──────────────────────── */
 .install-banner {
   position: fixed;

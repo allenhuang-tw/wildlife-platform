@@ -384,6 +384,14 @@ function bindEvents() {
       document.getElementById('detail-modal').classList.add('hidden');
   });
 
+  // Success modal
+  document.getElementById('close-success-modal').addEventListener('click', closeSuccessModal);
+  document.getElementById('success-close-btn').addEventListener('click', closeSuccessModal);
+  document.getElementById('success-view-my-btn').addEventListener('click', () => {
+    closeSuccessModal();
+    openMyReports();
+  });
+
   // Login prompt
   document.getElementById('login-prompt-btn').addEventListener('click', () => window.location.href = '/auth/line');
   document.getElementById('login-prompt-cancel').addEventListener('click', () => {
@@ -721,16 +729,26 @@ async function submitReport() {
     const res  = await fetch(url, { method, body: fd });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || (isEdit ? '更新失敗' : '提交失敗'));
-    showToast(isEdit ? '✅ 通報已更新！待管理員重新審核' : '✅ 通報已送出！待管理員審核後將顯示於地圖', 'success');
     closeReportModal();
     await loadReports();
     if (selectedLat && selectedLng) mainMap.flyTo([selectedLat, selectedLng], 14);
+    openSuccessModal(species, isEdit);
   } catch (err) {
     showToast(err.message, 'error');
   } finally {
     btn.textContent = isEdit ? '💾 儲存修改' : '📤 提交通報';
     btn.disabled = false;
   }
+}
+
+function openSuccessModal(species, isEdit) {
+  document.getElementById('success-title').textContent = isEdit ? '通報已更新！' : '通報已送出！';
+  document.getElementById('success-species').textContent = `${getEmoji(species)} ${species}`;
+  document.getElementById('success-modal').classList.remove('hidden');
+}
+
+function closeSuccessModal() {
+  document.getElementById('success-modal').classList.add('hidden');
 }
 
 // ── 詳情 Modal ────────────────────────────────────────────

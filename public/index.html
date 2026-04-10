@@ -235,6 +235,50 @@
   </div>
 </div>
 
+<!-- ═══════════════ SUCCESS MODAL ═══════════════ -->
+<div id="success-modal" class="modal-overlay hidden">
+  <div class="modal-box success-box">
+    <button class="close-btn success-close-btn" id="close-success-modal">✕</button>
+    <div class="success-body">
+      <div class="success-anim">
+        <div class="success-circle">
+          <span class="success-check">✓</span>
+        </div>
+      </div>
+      <h2 class="success-title" id="success-title">通報已送出！</h2>
+      <p class="success-species" id="success-species"></p>
+      <p class="success-hint">通報已進入審核流程，<br/>管理員審核通過後將顯示於地圖上</p>
+
+      <div class="success-steps">
+        <div class="success-step done">
+          <span class="step-icon">📤</span>
+          <span class="step-label">已送出</span>
+        </div>
+        <div class="success-step-arrow">›</div>
+        <div class="success-step">
+          <span class="step-icon">🔍</span>
+          <span class="step-label">管理員審核</span>
+        </div>
+        <div class="success-step-arrow">›</div>
+        <div class="success-step">
+          <span class="step-icon">💬</span>
+          <span class="step-label">LINE 通知</span>
+        </div>
+        <div class="success-step-arrow">›</div>
+        <div class="success-step">
+          <span class="step-icon">🗺️</span>
+          <span class="step-label">顯示地圖</span>
+        </div>
+      </div>
+
+      <div class="success-actions">
+        <button id="success-view-my-btn" class="btn-outline-dark">📋 查看我的通報</button>
+        <button id="success-close-btn" class="btn-primary">返回地圖</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════ INSTALL BANNER ═══════════════ -->
 <div id="install-banner" class="install-banner hidden">
   <img src="/wildlife.png" alt="" class="install-banner-icon" />
