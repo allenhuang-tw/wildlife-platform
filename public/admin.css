@@ -138,6 +138,47 @@ body {
   font-weight: 600;
 }
 
+/* ── CHARTS ── */
+.charts-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.chart-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+}
+.chart-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.chart-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.chart-wrap { position: relative; }
+.species-wrap { height: 280px; }
+.chart-empty {
+  text-align: center;
+  padding: 60px 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@media (max-width: 700px) {
+  .charts-section { grid-template-columns: 1fr; }
+  .species-wrap { height: 240px; }
+}
+
 /* ── BULK TOOLBAR ── */
 .bulk-toolbar {
   display: flex;

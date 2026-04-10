@@ -29,6 +29,8 @@ let pendingRejectId = null;
 let pendingBulkReject = false;
 let selectedIds = new Set();
 let allCounts = { pending: 0, approved: 0, rejected: 0 };
+let trendChart = null;
+let speciesChart = null;
 
 document.addEventListener('DOMContentLoaded', init);
 
@@ -120,6 +122,7 @@ async function loadAll() {
   document.getElementById('count-rejected').textContent = allCounts.rejected;
 
   renderReports();
+  renderCharts();
 }
 
 function renderReports() {
@@ -304,6 +307,110 @@ async function doBulkReview(action, reason) {
   );
   clearSelection();
   await loadAll();
+}
+
+// ── 統計圖表 ───────────────────────────────────────────────
+function renderCharts() {
+  renderTrendChart();
+  renderSpeciesChart();
+}
+
+function renderTrendChart() {
+  const labels = [];
+  const approvedData = [], pendingData = [], rejectedData = [];
+
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - i);
+    const yr = d.getFullYear();
+    const mo = d.getMonth();
+    labels.push(`${yr}/${String(mo + 1).padStart(2, '0')}`);
+
+    const inMonth = r => {
+      const rd = new Date(r.created_at);
+      return rd.getFullYear() === yr && rd.getMonth() === mo;
+    };
+    approvedData.push(cachedReports.filter(r => inMonth(r) && r.review_status === 'approved').length);
+    pendingData .push(cachedReports.filter(r => inMonth(r) && r.review_status === 'pending' ).length);
+    rejectedData.push(cachedReports.filter(r => inMonth(r) && r.review_status === 'rejected').length);
+  }
+
+  const ctx = document.getElementById('trend-chart').getContext('2d');
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: '已核准', data: approvedData, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.12)', tension: 0.4, fill: true, pointRadius: 4, pointHoverRadius: 6 },
+        { label: '待審核', data: pendingData,  borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,.10)', tension: 0.4, fill: true, pointRadius: 4, pointHoverRadius: 6 },
+        { label: '已拒絕', data: rejectedData, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,.08)',  tension: 0.4, fill: true, pointRadius: 4, pointHoverRadius: 6 },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, font: { size: 12 } } },
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0, stepSize: 1 }, grid: { color: 'rgba(0,0,0,.06)' } },
+        x: { grid: { display: false } },
+      }
+    }
+  });
+}
+
+function renderSpeciesChart() {
+  const wrap = document.getElementById('species-chart-wrap');
+  const counts = {};
+  cachedReports.forEach(r => {
+    if (r.species) counts[r.species] = (counts[r.species] || 0) + 1;
+  });
+
+  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+  if (!sorted.length) {
+    wrap.innerHTML = '<div class="chart-empty">尚無通報資料</div>';
+    return;
+  }
+
+  // 確保 canvas 存在（第一次渲染後不重建）
+  if (!document.getElementById('species-chart')) {
+    wrap.innerHTML = '<canvas id="species-chart"></canvas>';
+  }
+
+  const max    = sorted[0][1];
+  const labels = sorted.map(([k]) => `${getEmoji(k)} ${k}`);
+  const data   = sorted.map(([, v]) => v);
+  const colors = data.map(v => `rgba(45,106,79,${(0.35 + 0.65 * v / max).toFixed(2)})`);
+
+  const ctx = document.getElementById('species-chart').getContext('2d');
+  if (speciesChart) speciesChart.destroy();
+  speciesChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ label: '通報數', data, backgroundColor: colors, borderRadius: 4 }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: ctx => ` ${ctx.parsed.x} 筆` }
+        }
+      },
+      scales: {
+        x: { beginAtZero: true, ticks: { precision: 0, stepSize: 1 }, grid: { color: 'rgba(0,0,0,.06)' } },
+        y: { grid: { display: false }, ticks: { font: { size: 13 } } },
+      }
+    }
+  });
 }
 
 // ── Toast ──────────────────────────────────────────────────

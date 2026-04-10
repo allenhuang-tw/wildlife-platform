@@ -6,6 +6,7 @@
   <title>管理後台 — 野生動物通報平台</title>
   <link rel="icon" type="image/png" href="/wildlife.png" />
   <link rel="stylesheet" href="admin.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -57,6 +58,22 @@
       <div class="stat-card rejected">
         <div class="stat-num" id="count-rejected">0</div>
         <div class="stat-label">已拒絕</div>
+      </div>
+    </div>
+
+    <!-- 統計圖表 -->
+    <div class="charts-section">
+      <div class="chart-card">
+        <div class="chart-title">📈 每月通報趨勢 <span class="chart-sub">近 6 個月</span></div>
+        <div class="chart-wrap">
+          <canvas id="trend-chart"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">🦎 物種排行 <span class="chart-sub">TOP 10</span></div>
+        <div class="chart-wrap species-wrap" id="species-chart-wrap">
+          <canvas id="species-chart"></canvas>
+        </div>
       </div>
     </div>
 
