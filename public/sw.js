@@ -1,11 +1,9 @@
-const CACHE = 'wildlife-v1';
+const CACHE = 'wildlife-v2';
 const STATIC = [
   '/',
   '/style.css',
   '/app.js',
   '/wildlife.png',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
 ];
 
 // 安裝：快取靜態資源

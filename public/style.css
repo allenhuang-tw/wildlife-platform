@@ -32,7 +32,9 @@ body {
   background: var(--bg);
   color: var(--text);
   overflow: hidden;
-  height: 100dvh;
+  height: 100vh;          /* Safari 舊版 fallback */
+  height: 100dvh;         /* 現代瀏覽器（含 Chrome、Safari 16+）*/
+  height: -webkit-fill-available; /* iOS Safari 精確高度 */
   display: flex;
   flex-direction: column;
 }
@@ -255,6 +257,7 @@ header {
   justify-content: center;
   overflow-y: auto;
   padding: 20px 12px 40px;
+  -webkit-backdrop-filter: blur(3px); /* Safari */
   backdrop-filter: blur(3px);
 }
 
@@ -298,6 +301,7 @@ header {
 
 .modal-body {
   padding: 20px;
+  max-height: calc(100vh - 180px);
   max-height: calc(100dvh - 180px);
   overflow-y: auto;
 }
@@ -740,6 +744,7 @@ button, input, select, textarea {
   .modal-box {
     border-radius: var(--radius) var(--radius) 0 0;
     max-width: 100%;
+    max-height: 93vh;            /* Safari 舊版 fallback */
     max-height: 93dvh;           /* 留一點空間看到地圖 */
     overflow: hidden;
     display: flex;
