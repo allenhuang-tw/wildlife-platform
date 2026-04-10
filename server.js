@@ -458,6 +458,45 @@ app.delete('/api/reports/:id', requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+// ── 留言 API ──────────────────────────────────────────────
+app.get('/api/reports/:id/comments', async (req, res) => {
+  const { data, error } = await supabase
+    .from('comments').select('*')
+    .eq('report_id', req.params.id)
+    .order('created_at', { ascending: true });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+app.post('/api/reports/:id/comments', requireAuth, async (req, res) => {
+  const user = getUser(req);
+  const content = (req.body.content || '').trim();
+  if (!content) return res.status(400).json({ error: '留言不能為空' });
+  if (content.length > 500) return res.status(400).json({ error: '留言最多 500 字' });
+
+  const { data, error } = await supabase.from('comments').insert({
+    report_id:   parseInt(req.params.id),
+    user_id:     user.id,
+    user_name:   user.name,
+    user_avatar: user.avatar || '',
+    content,
+  }).select().single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.delete('/api/comments/:id', requireAuth, async (req, res) => {
+  const user = getUser(req);
+  const { data: c } = await supabase
+    .from('comments').select('user_id').eq('id', req.params.id).single();
+  if (!c) return res.status(404).json({ error: '留言不存在' });
+  if (c.user_id !== user.id && !isAdmin(user))
+    return res.status(403).json({ error: '無權限刪除' });
+  await supabase.from('comments').delete().eq('id', req.params.id);
+  res.json({ success: true });
+});
+
 // ── 健康檢查 ──────────────────────────────────────────────
 app.get('/api/health', async (req, res) => {
   const checks = {

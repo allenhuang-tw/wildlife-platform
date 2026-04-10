@@ -30,6 +30,12 @@ function getEmoji(species) {
 const STATUS_LABELS = { alive:'存活', injured:'受傷', dead:'死亡', unknown:'不確定' };
 const STATUS_COLORS = { alive:'#22c55e', injured:'#f97316', dead:'#ef4444', unknown:'#94a3b8' };
 
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
 // ── PWA Service Worker 註冊 ─────────────────────────────
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -856,8 +862,13 @@ async function lineLogin() {
 
 // ── 詳情 Modal ────────────────────────────────────────────
 async function openDetailModal(id) {
-  const res = await fetch(`/api/reports/${id}`);
-  const r = await res.json();
+  // 同時取通報 + 留言
+  const [repRes, comRes] = await Promise.all([
+    fetch(`/api/reports/${id}`),
+    fetch(`/api/reports/${id}/comments`),
+  ]);
+  const r = await repRes.json();
+  const comments = comRes.ok ? await comRes.json() : [];
 
   document.getElementById('detail-title').textContent = `${getEmoji(r.species)} ${r.species}`;
 
@@ -867,7 +878,6 @@ async function openDetailModal(id) {
     ? `<img src="${r.user_avatar || ''}" onerror="this.style.display='none'" /><span>由 ${r.user_name} 通報</span>`
     : '<span>由匿名用戶通報（範例資料）</span>';
 
-  // image_paths 有時從 Supabase 回來是 string，需要解析
   let imagePaths = r.image_paths || [];
   if (typeof imagePaths === 'string') {
     try { imagePaths = JSON.parse(imagePaths); } catch { imagePaths = []; }
@@ -878,12 +888,28 @@ async function openDetailModal(id) {
       ).join('')}</div>`
     : '';
 
+  // 留言輸入區
+  const commentForm = currentUser
+    ? `<div class="comment-form">
+        <img src="${escapeHtml(currentUser.avatar || '')}" class="comment-avatar" onerror="this.style.display='none'" />
+        <div class="comment-form-inner">
+          <textarea id="comment-input" placeholder="補充觀察、行為或更多資訊…" rows="2" maxlength="500"></textarea>
+          <div class="comment-form-footer">
+            <span class="comment-char-hint" id="comment-char">0 / 500</span>
+            <button class="btn-primary comment-submit-btn" id="comment-submit-btn">送出留言</button>
+          </div>
+        </div>
+       </div>`
+    : `<div class="comment-login-hint">
+        <button class="line-btn" style="font-size:13px;padding:8px 14px" onclick="lineLogin()">🔐 登入後留言</button>
+       </div>`;
+
   document.getElementById('detail-body').innerHTML = `
     ${imgs}
     <div class="detail-meta">
       <div class="detail-row">
         <span class="detail-label">物種</span>
-        <span class="detail-value">${r.species}</span>
+        <span class="detail-value">${escapeHtml(r.species)}</span>
       </div>
       <div class="detail-row">
         <span class="detail-label">數量</span>
@@ -891,9 +917,7 @@ async function openDetailModal(id) {
       </div>
       <div class="detail-row">
         <span class="detail-label">狀態</span>
-        <span class="detail-value">
-          <span class="status-badge ${r.status}">${statusLabel}</span>
-        </span>
+        <span class="detail-value"><span class="status-badge ${r.status}">${statusLabel}</span></span>
       </div>
       <div class="detail-row">
         <span class="detail-label">通報時間</span>
@@ -902,11 +926,28 @@ async function openDetailModal(id) {
     </div>
     <div class="detail-row" style="margin-bottom:12px">
       <span class="detail-label">地點</span>
-      <span class="detail-value" style="font-size:13px;font-weight:500;margin-top:4px;display:block">📍 ${addr}</span>
+      <span class="detail-value" style="font-size:13px;font-weight:500;margin-top:4px;display:block">📍 ${escapeHtml(addr)}</span>
     </div>
-    ${r.description ? `<div class="detail-desc">${r.description}</div>` : ''}
+    ${r.description ? `<div class="detail-desc">${escapeHtml(r.description)}</div>` : ''}
     <div class="detail-reporter">${reporter} ・ ${formatDate(r.created_at)}</div>
+
+    <!-- 留言區 -->
+    <div class="comment-section">
+      <div class="comment-section-header">
+        <span>💬 留言討論</span>
+        <span class="comment-total" id="comment-total">${comments.length} 則</span>
+      </div>
+      <div class="comment-list" id="comment-list">
+        ${comments.length
+          ? comments.map(c => buildCommentItem(c)).join('')
+          : '<div class="comment-empty">還沒有留言，成為第一個！</div>'}
+      </div>
+      ${commentForm}
+    </div>
   `;
+
+  // 綁定留言互動
+  bindCommentForm(id);
 
   // 顯示編輯按鈕（本人才看得到）
   const footer  = document.getElementById('detail-footer');
@@ -923,6 +964,105 @@ async function openDetailModal(id) {
   }
 
   document.getElementById('detail-modal').classList.remove('hidden');
+}
+
+// ── 留言功能 ──────────────────────────────────────────────
+function buildCommentItem(c) {
+  const isOwn = currentUser && currentUser.id === c.user_id;
+  const delBtn = isOwn
+    ? `<button class="comment-del-btn" data-id="${c.id}" title="刪除留言">✕</button>` : '';
+  return `
+    <div class="comment-item" id="comment-item-${c.id}">
+      <img src="${escapeHtml(c.user_avatar || '')}" class="comment-avatar"
+           onerror="this.style.display='none'" />
+      <div class="comment-bubble">
+        <div class="comment-meta">
+          <strong class="comment-name">${escapeHtml(c.user_name)}</strong>
+          <span class="comment-time">${formatDate(c.created_at)}</span>
+          ${delBtn}
+        </div>
+        <div class="comment-content">${escapeHtml(c.content)}</div>
+      </div>
+    </div>`;
+}
+
+function bindCommentForm(reportId) {
+  const input     = document.getElementById('comment-input');
+  const submitBtn = document.getElementById('comment-submit-btn');
+  const charHint  = document.getElementById('comment-char');
+  const list      = document.getElementById('comment-list');
+
+  if (input && charHint) {
+    input.addEventListener('input', () => {
+      charHint.textContent = `${input.value.length} / 500`;
+    });
+    // Ctrl/Cmd+Enter 快速送出
+    input.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') submitComment(reportId);
+    });
+  }
+  if (submitBtn) submitBtn.addEventListener('click', () => submitComment(reportId));
+
+  // 刪除留言（事件委派）
+  if (list) {
+    list.addEventListener('click', e => {
+      const btn = e.target.closest('.comment-del-btn');
+      if (btn) deleteComment(parseInt(btn.dataset.id), reportId);
+    });
+  }
+}
+
+async function submitComment(reportId) {
+  const input     = document.getElementById('comment-input');
+  const submitBtn = document.getElementById('comment-submit-btn');
+  const content   = input?.value.trim();
+  if (!content) return;
+
+  submitBtn.textContent = '送出中…'; submitBtn.disabled = true;
+  try {
+    const res  = await fetch(`/api/reports/${reportId}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '送出失敗');
+
+    const list  = document.getElementById('comment-list');
+    const empty = list?.querySelector('.comment-empty');
+    if (empty) empty.remove();
+    list?.insertAdjacentHTML('beforeend', buildCommentItem(data));
+    list?.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    updateCommentCount(1);
+    input.value = '';
+    const charHint = document.getElementById('comment-char');
+    if (charHint) charHint.textContent = '0 / 500';
+  } catch (err) {
+    showToast(err.message, 'error');
+  } finally {
+    submitBtn.textContent = '送出留言'; submitBtn.disabled = false;
+  }
+}
+
+async function deleteComment(commentId, reportId) {
+  if (!confirm('確定刪除這則留言？')) return;
+  const res = await fetch(`/api/comments/${commentId}`, { method: 'DELETE' });
+  if (!res.ok) { const d = await res.json(); showToast(d.error || '刪除失敗', 'error'); return; }
+  document.getElementById(`comment-item-${commentId}`)?.remove();
+  updateCommentCount(-1);
+  // 若列表空了補提示
+  const list = document.getElementById('comment-list');
+  if (list && !list.children.length) {
+    list.innerHTML = '<div class="comment-empty">還沒有留言，成為第一個！</div>';
+  }
+}
+
+function updateCommentCount(delta) {
+  const el = document.getElementById('comment-total');
+  if (!el) return;
+  const n = Math.max(0, (parseInt(el.textContent) || 0) + delta);
+  el.textContent = `${n} 則`;
 }
 
 // ── 我的通報 ──────────────────────────────────────────────
