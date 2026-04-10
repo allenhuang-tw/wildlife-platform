@@ -149,7 +149,7 @@ app.get('/auth/line/callback', async (req, res) => {
 app.get('/auth/user', (req, res) => {
   const user = getUser(req);
   if (user) req.session.user = user;  // 補回 session
-  res.json({ user: user || null });
+  res.json({ user: user || null, isAdmin: isAdmin(user) });
 });
 
 app.post('/auth/logout', (req, res) => {

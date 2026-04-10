@@ -146,10 +146,10 @@ async function checkAuth() {
   const res = await fetch('/auth/user');
   const data = await res.json();
   currentUser = data.user;
-  renderAuthUI();
+  renderAuthUI(data.isAdmin);
 }
 
-function renderAuthUI() {
+function renderAuthUI(isAdmin = false) {
   const loginBtn = document.getElementById('line-login-btn');
   const userInfo = document.getElementById('user-info');
   if (currentUser) {
@@ -157,6 +157,8 @@ function renderAuthUI() {
     userInfo.classList.remove('hidden');
     document.getElementById('user-avatar').src = currentUser.avatar || '';
     document.getElementById('user-name').textContent = currentUser.name;
+    const adminBtn = document.getElementById('admin-btn');
+    if (adminBtn) adminBtn.classList.toggle('hidden', !isAdmin);
   } else {
     loginBtn.classList.remove('hidden');
     userInfo.classList.add('hidden');
