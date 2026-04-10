@@ -30,6 +30,13 @@ function getEmoji(species) {
 const STATUS_LABELS = { alive:'存活', injured:'受傷', dead:'死亡', unknown:'不確定' };
 const STATUS_COLORS = { alive:'#22c55e', injured:'#f97316', dead:'#ef4444', unknown:'#94a3b8' };
 
+// ── PWA Service Worker 註冊 ─────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
 // ── 全域狀態 ────────────────────────────────────────────
 let mainMap, miniMapMap, addrMap, gpsMap;
 let markersLayer;
@@ -44,8 +51,11 @@ let miniMapMarker = null;
 let addrMapMarker = null;
 let gpsMapMarker  = null;
 let miniMapReady = false;
-let editingReportId = null;   // null = 新增模式, 數字 = 編輯模式
-let keepImages = [];          // 編輯時要保留的舊圖 URL
+let editingReportId = null;
+let keepImages = [];
+// 篩選狀態
+let filterStatus = ['alive','injured','dead','unknown'];
+let filterDays   = '';
 
 // ── 啟動 ────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -93,11 +103,24 @@ function initMainMap() {
 
 // ── 讀取通報 ──────────────────────────────────────────────
 async function loadReports(filterSpecies = '') {
-  const url = filterSpecies ? `/api/reports?species=${encodeURIComponent(filterSpecies)}` : '/api/reports';
-  const res = await fetch(url);
+  const params = new URLSearchParams();
+  if (filterSpecies)                          params.set('species', filterSpecies);
+  if (filterStatus.length < 4)               params.set('status', filterStatus.join(','));
+  if (filterDays)                             params.set('days', filterDays);
+  const res = await fetch('/api/reports?' + params.toString());
   allReports = await res.json();
   renderMarkers(allReports);
   document.getElementById('total-reports').textContent = allReports.length;
+  updateFilterCount();
+}
+
+function updateFilterCount() {
+  const count = (filterStatus.length < 4 ? 1 : 0) + (filterDays ? 1 : 0);
+  const badge = document.getElementById('filter-count');
+  const btn   = document.getElementById('filter-btn');
+  badge.textContent = count;
+  badge.classList.toggle('hidden', count === 0);
+  btn.classList.toggle('active', count > 0);
 }
 
 function renderMarkers(reports) {
@@ -154,6 +177,50 @@ function bindEvents() {
     currentUser = null;
     renderAuthUI();
     showToast('已登出');
+  });
+
+  // ── 進階篩選 ──
+  const filterBtn   = document.getElementById('filter-btn');
+  const filterPanel = document.getElementById('filter-panel');
+
+  filterBtn.addEventListener('click', () => {
+    filterPanel.classList.toggle('hidden');
+  });
+
+  // checkbox 樣式同步
+  document.querySelectorAll('.fcheck').forEach(label => {
+    const cb = label.querySelector('input');
+    label.classList.toggle('checked', cb.checked);
+    cb.addEventListener('change', () => label.classList.toggle('checked', cb.checked));
+  });
+
+  // 時間範圍按鈕
+  document.querySelectorAll('.day-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  // 套用篩選
+  document.getElementById('filter-apply').addEventListener('click', () => {
+    filterStatus = Array.from(document.querySelectorAll('.fcheck input:checked')).map(cb => cb.value);
+    if (!filterStatus.length) filterStatus = ['alive','injured','dead','unknown'];
+    filterDays = document.querySelector('.day-btn.active')?.dataset.days || '';
+    filterPanel.classList.add('hidden');
+    loadReports(document.getElementById('filter-input').value.trim());
+  });
+
+  // 重設篩選
+  document.getElementById('filter-reset').addEventListener('click', () => {
+    filterStatus = ['alive','injured','dead','unknown'];
+    filterDays   = '';
+    document.querySelectorAll('.fcheck input').forEach(cb => { cb.checked = true; cb.closest('.fcheck').classList.add('checked'); });
+    document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('.day-btn[data-days=""]').classList.add('active');
+    updateFilterCount();
+    filterPanel.classList.add('hidden');
+    loadReports(document.getElementById('filter-input').value.trim());
   });
 
   // 我的通報

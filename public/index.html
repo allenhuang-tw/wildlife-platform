@@ -6,6 +6,12 @@
   <title>野生動物通報平台</title>
   <link rel="icon" type="image/png" href="/wildlife.png" />
   <link rel="apple-touch-icon" href="/wildlife.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#2d6a4f" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="野生動物" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -50,6 +56,37 @@
     <span class="legend-dot injured"></span>受傷
     <span class="legend-dot dead"></span>死亡
     <span class="legend-dot unknown"></span>不確定
+  </div>
+  <button id="filter-btn" class="filter-toggle-btn" title="進階篩選">
+    ⚙️ <span class="filter-count hidden" id="filter-count">0</span>
+  </button>
+</div>
+
+<!-- ═══════════════ FILTER PANEL ═══════════════ -->
+<div id="filter-panel" class="filter-panel hidden">
+  <div class="filter-panel-inner">
+    <div class="filter-group">
+      <div class="filter-label">動物狀態</div>
+      <div class="filter-checks">
+        <label class="fcheck"><input type="checkbox" value="alive"    checked /> 🟢 存活</label>
+        <label class="fcheck"><input type="checkbox" value="injured"  checked /> 🟠 受傷</label>
+        <label class="fcheck"><input type="checkbox" value="dead"     checked /> 🔴 死亡</label>
+        <label class="fcheck"><input type="checkbox" value="unknown"  checked /> ⚪ 不確定</label>
+      </div>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">時間範圍</div>
+      <div class="filter-days">
+        <button class="day-btn active" data-days="">全部</button>
+        <button class="day-btn" data-days="7">近一週</button>
+        <button class="day-btn" data-days="30">近一個月</button>
+        <button class="day-btn" data-days="90">近三個月</button>
+      </div>
+    </div>
+    <div class="filter-actions">
+      <button id="filter-reset" class="btn-text">重設</button>
+      <button id="filter-apply" class="btn-primary" style="padding:8px 20px;font-size:13px">套用篩選</button>
+    </div>
   </div>
 </div>
 

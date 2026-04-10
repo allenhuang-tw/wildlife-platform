@@ -171,11 +171,25 @@ app.get('/api/my-reports', requireAuth, async (req, res) => {
 });
 
 app.get('/api/reports', async (req, res) => {
-  const { species } = req.query;
+  const { species, status, days } = req.query;
   let query = supabase.from('reports').select('*')
-    .eq('review_status', 'approved')          // 只顯示已核准
+    .eq('review_status', 'approved')
     .order('created_at', { ascending: false });
+
   if (species) query = query.ilike('species', `%${species}%`);
+
+  // 動物狀態篩選（逗號分隔，如 alive,injured）
+  if (status) {
+    const statuses = status.split(',').map(s => s.trim()).filter(Boolean);
+    if (statuses.length > 0 && statuses.length < 4) query = query.in('status', statuses);
+  }
+
+  // 時間範圍篩選
+  if (days && !isNaN(parseInt(days))) {
+    const since = new Date(Date.now() - parseInt(days) * 86400000).toISOString();
+    query = query.gte('created_at', since);
+  }
+
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
@@ -205,12 +219,75 @@ app.put('/admin/api/reports/:id/review', requireAdmin, async (req, res) => {
   const { action, reason } = req.body;
   if (!['approve','reject'].includes(action)) return res.status(400).json({ error: '無效操作' });
   const review_status = action === 'approve' ? 'approved' : 'rejected';
+
+  // 取得通報資訊（含通報者 LINE ID）
+  const { data: report } = await supabase
+    .from('reports').select('*, users(line_id, display_name)')
+    .eq('id', req.params.id).single();
+
   const { error } = await supabase.from('reports')
     .update({ review_status, reject_reason: reason || null })
     .eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
+
+  // LINE 推播通知
+  if (report?.user_id && process.env.LINE_MESSAGING_TOKEN) {
+    const lineId = report.users?.line_id;
+    if (lineId) sendLineNotify(lineId, report.species, action, reason).catch(console.error);
+  }
+
   res.json({ success: true });
 });
+
+async function sendLineNotify(lineId, species, action, reason) {
+  const SITE = process.env.LINE_REDIRECT_URI?.replace('/auth/line/callback', '') || 'https://wildlife-platform.onrender.com';
+  const approved = action === 'approve';
+  const message = {
+    type: 'flex',
+    altText: approved
+      ? `您的通報「${species}」已通過審核！`
+      : `您的通報「${species}」未通過審核`,
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box', layout: 'vertical',
+        backgroundColor: approved ? '#1b4332' : '#7f1d1d',
+        paddingAll: '16px',
+        contents: [{
+          type: 'text',
+          text: approved ? '✅ 通報已核准' : '❌ 通報未通過',
+          color: '#ffffff', weight: 'bold', size: 'lg'
+        }]
+      },
+      body: {
+        type: 'box', layout: 'vertical', spacing: 'sm', paddingAll: '16px',
+        contents: [
+          { type: 'text', text: `物種：${species}`, size: 'md', weight: 'bold', color: '#111827' },
+          { type: 'text', text: approved
+              ? '您的通報已通過審核，現已顯示於地圖上，感謝您的貢獻！'
+              : `很抱歉，您的通報未通過審核。${reason ? `\n原因：${reason}` : ''}`,
+            wrap: true, size: 'sm', color: '#374151', margin: 'sm' }
+        ]
+      },
+      footer: {
+        type: 'box', layout: 'vertical', paddingAll: '12px',
+        contents: [{
+          type: 'button', style: 'primary',
+          color: '#2d6a4f',
+          action: { type: 'uri', label: '前往地圖查看', uri: SITE }
+        }]
+      }
+    }
+  };
+
+  await axios.post('https://api.line.me/v2/bot/message/push',
+    { to: lineId, messages: [message] },
+    { headers: {
+        'Authorization': `Bearer ${process.env.LINE_MESSAGING_TOKEN}`,
+        'Content-Type': 'application/json'
+    }}
+  );
+}
 
 app.get('/api/reports/:id', async (req, res) => {
   const { data, error } = await supabase

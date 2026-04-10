@@ -810,6 +810,88 @@ button, input, select, textarea {
   .upload-placeholder small{ font-size: 11px; }
 }
 
+/* ── FILTER TOGGLE ───────────────────────── */
+.filter-toggle-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 9px;
+  font-size: 16px;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: background .15s;
+}
+.filter-toggle-btn:hover { background: #dff0e0; }
+.filter-toggle-btn.active { background: var(--primary); border-color: var(--primary); }
+
+.filter-count {
+  position: absolute;
+  top: -5px; right: -5px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 3px;
+}
+
+/* ── FILTER PANEL ────────────────────────── */
+.filter-panel {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  z-index: 850;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+}
+.filter-panel-inner {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.filter-group { display: flex; flex-direction: column; gap: 6px; }
+.filter-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+.filter-checks { display: flex; gap: 8px; flex-wrap: wrap; }
+.fcheck {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 13px; cursor: pointer;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 10px;
+  transition: all .15s;
+}
+.fcheck:hover { background: #dff0e0; }
+.fcheck input { display: none; }
+.fcheck.checked { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+.filter-days { display: flex; gap: 6px; }
+.day-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 20px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .15s;
+  color: var(--text-muted);
+}
+.day-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600; }
+.day-btn:hover:not(.active) { background: #dff0e0; }
+
+.filter-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+@media (max-width: 600px) {
+  .filter-panel-inner { gap: 12px; }
+  .filter-actions { margin-left: 0; width: 100%; justify-content: flex-end; }
+}
+
 /* ── MY REPORTS MODAL ────────────────────── */
 .my-reports-box { max-width: 500px; }
 
