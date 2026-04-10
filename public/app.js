@@ -138,14 +138,31 @@ let filterDays   = '';
 // ── 啟動 ────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   initMainMap();
-  bindEvents();       // 先綁事件，確保按鈕一定有反應
+  bindEvents();
   checkUrlError();
   await checkAuth();
   await loadReports().catch(err => {
     console.error('載入通報失敗:', err);
     showToast('資料載入失敗，請重新整理', 'error');
   });
+  await checkUrlParams();
 });
+
+// 處理分享連結 (?report=ID)
+async function checkUrlParams() {
+  const params   = new URLSearchParams(location.search);
+  const reportId = parseInt(params.get('report'));
+  if (!reportId) return;
+
+  // 試著飛到通報位置
+  const found = allReports.find(r => r.id === reportId);
+  if (found) mainMap.flyTo([found.lat, found.lng], 15);
+
+  await openDetailModal(reportId).catch(() => {
+    showToast('找不到此通報', 'error');
+    history.replaceState({}, '', '/');
+  });
+}
 
 // ── 認證 ─────────────────────────────────────────────────
 async function checkAuth() {
@@ -384,8 +401,10 @@ function bindEvents() {
   document.getElementById('submit-btn').addEventListener('click', submitReport);
 
   // Detail modal close
-  document.getElementById('close-detail-modal').addEventListener('click', () => {
-    document.getElementById('detail-modal').classList.add('hidden');
+  document.getElementById('close-detail-modal').addEventListener('click', closeDetailModal);
+  // 點遮罩關閉
+  document.getElementById('detail-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('detail-modal')) closeDetailModal();
   });
   document.getElementById('detail-modal').addEventListener('click', e => {
     if (e.target === document.getElementById('detail-modal'))
@@ -949,21 +968,47 @@ async function openDetailModal(id) {
   // 綁定留言互動
   bindCommentForm(id);
 
-  // 顯示編輯按鈕（本人才看得到）
-  const footer  = document.getElementById('detail-footer');
-  const editBtn = document.getElementById('edit-report-btn');
+  // Footer 永遠顯示（含分享按鈕）
+  const ownerActions = document.getElementById('detail-owner-actions');
+  const editBtn      = document.getElementById('edit-report-btn');
   if (currentUser && currentUser.id === r.user_id) {
-    footer.style.display = '';
+    ownerActions.classList.remove('hidden');
     editBtn.onclick = () => openEditModal(r);
     const delBtn = document.getElementById('delete-report-btn');
     delBtn.textContent = '🗑️ 刪除';
     delBtn.disabled = false;
     delBtn.onclick = () => deleteReport(r.id, r.species);
   } else {
-    footer.style.display = 'none';
+    ownerActions.classList.add('hidden');
   }
 
+  // 分享按鈕
+  document.getElementById('share-report-btn').onclick = () => shareReport(r.id, r.species);
+
+  // 更新網址列，方便書籤 / 直接分享
+  history.pushState({ reportId: id }, '', `/?report=${id}`);
+
   document.getElementById('detail-modal').classList.remove('hidden');
+}
+
+// ── 分享通報 ──────────────────────────────────────────────
+function shareReport(reportId, species) {
+  const url  = `${location.origin}/?report=${reportId}`;
+  const text = `發現了一筆 ${species} 的野生動物通報！`;
+
+  if (navigator.share) {
+    navigator.share({ title: `野生動物通報：${species}`, text, url }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(url)
+      .then(() => showToast('🔗 分享連結已複製！', 'success'))
+      .catch(() => { prompt('複製此連結：', url); });
+  }
+}
+
+function closeDetailModal() {
+  document.getElementById('detail-modal').classList.add('hidden');
+  // 恢復乾淨網址
+  if (location.search.includes('report=')) history.pushState({}, '', '/');
 }
 
 // ── 留言功能 ──────────────────────────────────────────────
