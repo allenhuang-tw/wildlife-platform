@@ -647,18 +647,24 @@ function showSuggestions(items) {
 
   box.querySelectorAll('.suggestion-item').forEach(el => {
     el.addEventListener('mousedown', e => {
-      e.preventDefault(); // 防止 input blur 先觸發
-      const lat     = parseFloat(el.dataset.lat);
-      const lng     = parseFloat(el.dataset.lng);
+      e.preventDefault();
       const name    = decodeURIComponent(el.dataset.name);
       const display = decodeURIComponent(el.dataset.display);
+      const lat     = el.dataset.lat !== 'null' ? parseFloat(el.dataset.lat) : null;
+      const lng     = el.dataset.lng !== 'null' ? parseFloat(el.dataset.lng) : null;
       document.getElementById('addr-input').value = name;
       hideSuggestions();
-      if (!miniMapReady) return;
-      miniMapMap.flyTo([lat, lng], 17, { animate: true, duration: 0.8 });
-      placeMapMarker(lat, lng);
-      selectedAddress = display;
-      showLocationBadge(display);
+      if (lat && lng) {
+        // 已有座標（非 Google Places 路徑）
+        if (!miniMapReady) return;
+        miniMapMap.flyTo([lat, lng], 17, { animate: true, duration: 0.8 });
+        placeMapMarker(lat, lng);
+        selectedAddress = display;
+        showLocationBadge(display);
+      } else {
+        // Google Places 路徑：用 display_name 再 geocode 取座標
+        geocodeByAddress(display);
+      }
     });
   });
 }
@@ -667,7 +673,25 @@ function hideSuggestions() {
   document.getElementById('addr-suggestions').classList.add('hidden');
 }
 
-// Address search — pans the shared miniMapMap (via server proxy: NLSC → Nominatim)
+// 用地址字串取得座標並定位（供 autocomplete 選取後呼叫）
+async function geocodeByAddress(address) {
+  if (!miniMapReady) return;
+  showLocationBadge('📡 解析中…');
+  try {
+    const res  = await fetch(`/api/geocode?q=${encodeURIComponent(address)}`);
+    const data = await res.json();
+    if (!data.length) { showToast('無法解析位置', 'error'); return; }
+    const { lat, lng, display_name } = data[0];
+    miniMapMap.flyTo([lat, lng], 17, { animate: true, duration: 0.8 });
+    placeMapMarker(lat, lng);
+    selectedAddress = display_name || address;
+    showLocationBadge(selectedAddress);
+  } catch {
+    showToast('位置解析失敗', 'error');
+  }
+}
+
+// Address search — pans the shared miniMapMap (via server proxy: Google → NLSC fallback)
 async function geocodeAddress() {
   const q = document.getElementById('addr-input').value.trim();
   if (!q) return;

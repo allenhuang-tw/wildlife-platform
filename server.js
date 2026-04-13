@@ -518,40 +518,25 @@ app.get('/api/health', async (req, res) => {
   res.json(checks);
 });
 
-// ── 地址 Autocomplete 建議（Nominatim）───────────────────────
+// ── 地址 Autocomplete 建議（Google Places Autocomplete）──────
 app.get('/api/geocode/suggest', async (req, res) => {
   const q = (req.query.q || '').trim();
   if (q.length < 2) return res.json([]);
 
+  const GKEY = process.env.GOOGLE_PLACES_KEY;
+  if (!GKEY) return res.json([]);
+
   try {
-    const r = await axios.get('https://nominatim.openstreetmap.org/search', {
-      params: {
-        q,
-        format: 'json',
-        limit: 6,
-        countrycodes: 'tw',
-        'accept-language': 'zh-TW',
-        addressdetails: 1
-      },
-      headers: { 'User-Agent': 'WildlifePlatform/1.0', 'Accept-Language': 'zh-TW' },
-      timeout: 6000
+    const r = await axios.get('https://maps.googleapis.com/maps/api/place/autocomplete/json', {
+      params: { input: q, language: 'zh-TW', components: 'country:tw', key: GKEY },
+      timeout: 5000
     });
-    const results = (r.data || []).map(d => {
-      const addr = d.address || {};
-      // 取有意義的短名稱
-      const name = addr.amenity || addr.tourism || addr.building ||
-                   addr.road || addr.suburb || addr.city_district ||
-                   d.display_name.split(',')[0];
-      const sub  = [addr.city || addr.county || addr.town || addr.village,
-                    addr.state].filter(Boolean).join(' · ');
-      return {
-        lat: parseFloat(d.lat),
-        lng: parseFloat(d.lon),
-        name: name.trim(),
-        sub,
-        display_name: d.display_name
-      };
-    });
+    const results = (r.data.predictions || []).map(p => ({
+      name: p.structured_formatting?.main_text || p.description,
+      sub:  p.structured_formatting?.secondary_text || '',
+      display_name: p.description,
+      lat: null, lng: null   // 選取後再 geocode
+    }));
     res.json(results);
   } catch {
     res.json([]);
@@ -582,16 +567,36 @@ app.get('/api/geocode', async (req, res) => {
   const q = (req.query.q || '').trim();
   if (!q) return res.status(400).json({ error: 'missing q' });
 
-  const norm = q.replace(/臺/g, '台');
+  const GKEY = process.env.GOOGLE_GEOCODE_KEY;
 
-  // 1. 嘗試 NLSC（國土測繪中心）台灣地址定位服務
+  // 1. Google Geocoding API
+  if (GKEY) {
+    try {
+      const r = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
+        params: { address: q, region: 'tw', language: 'zh-TW', key: GKEY },
+        timeout: 6000
+      });
+      if (r.data.results?.length) {
+        return res.json(r.data.results.slice(0, 3).map(d => ({
+          lat: d.geometry.location.lat,
+          lng: d.geometry.location.lng,
+          display_name: d.formatted_address,
+          source: 'google'
+        })));
+      }
+    } catch (e) {
+      console.log('[Google Geocode error]', e.message);
+    }
+  }
+
+  // 2. Fallback: NLSC
   try {
+    const norm = q.replace(/臺/g, '台');
     const nlscRes = await axios.get(
       'https://geocoding.nlsc.gov.tw/nlsc/toLonLat.action',
       { params: { address: norm, format: 'json' }, timeout: 6000 }
     );
     const d = nlscRes.data;
-    console.log('[NLSC]', norm, '→', JSON.stringify(d));
     if (d && d.error === '0' && d.longitude && d.latitude) {
       return res.json([{
         lat: parseFloat(d.latitude),
@@ -600,47 +605,7 @@ app.get('/api/geocode', async (req, res) => {
         source: 'nlsc'
       }]);
     }
-  } catch (e) {
-    console.log('[NLSC error]', e.message);
-  }
-
-  // 2. Nominatim — 先用原始查詢，失敗再用拆解後的結構化查詢
-  const parsed = parseTwAddress(q);
-  // 結構化查詢：路+號, 區, 市
-  const structured = [
-    parsed.road + (parsed.sec || '') + (parsed.num ? ' ' + parsed.num : ''),
-    parsed.dist,
-    parsed.city
-  ].filter(Boolean).join(', ');
-
-  const queries = [norm];
-  if (structured && structured !== norm) queries.push(structured);
-  // 最後備案：只搜路名（精確度低但至少找得到）
-  if (parsed.road) queries.push(parsed.road + (parsed.sec || '') + ', ' + (parsed.city || '台灣'));
-
-  for (const qStr of queries) {
-    try {
-      const nomRes = await axios.get(
-        'https://nominatim.openstreetmap.org/search',
-        {
-          params: { q: qStr, format: 'json', limit: 3, countrycodes: 'tw', 'accept-language': 'zh-TW' },
-          headers: { 'User-Agent': 'WildlifePlatform/1.0' },
-          timeout: 6000
-        }
-      );
-      console.log('[Nominatim]', qStr, '→', nomRes.data?.length, '筆');
-      if (nomRes.data?.length) {
-        return res.json(nomRes.data.map(d => ({
-          lat: parseFloat(d.lat),
-          lng: parseFloat(d.lon),
-          display_name: d.display_name,
-          source: 'nominatim'
-        })));
-      }
-    } catch (e) {
-      console.log('[Nominatim error]', e.message);
-    }
-  }
+  } catch (_) {}
 
   return res.json([]);
 });
