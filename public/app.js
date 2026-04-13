@@ -121,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── 全域狀態 ────────────────────────────────────────────
-let mainMap, miniMapMap, addrMap, gpsMap;
+let mainMap, miniMapMap;
 let markersLayer;
 let allReports = [];
 let currentUser = null;
@@ -129,10 +129,7 @@ let selectedLat = null, selectedLng = null;
 let selectedAddress = '';
 let selectedStatus = 'alive';
 let photoFiles = [];
-let activeTab = 'map';
 let miniMapMarker = null;
-let addrMapMarker = null;
-let gpsMapMarker  = null;
 let miniMapReady = false;
 let editingReportId = null;
 let keepImages = [];
@@ -367,11 +364,6 @@ function bindEvents() {
     if (e.target === document.getElementById('report-modal')) closeReportModal();
   });
 
-  // Location tabs
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
-  });
-
   // Address search
   document.getElementById('addr-search-btn').addEventListener('click', geocodeAddress);
   document.getElementById('addr-input').addEventListener('keydown', e => {
@@ -450,11 +442,15 @@ function openReportModal() {
   setTimeout(() => {
     if (!miniMapReady) {
       miniMapMap = L.map('mini-map').setView([23.6978, 120.9605], 8);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(miniMapMap);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+      }).addTo(miniMapMap);
       miniMapMap.on('click', onMiniMapClick);
       miniMapReady = true;
     } else {
       miniMapMap.invalidateSize();
+      miniMapMap.setView([23.6978, 120.9605], 8);
     }
   }, 100);
 }
@@ -502,18 +498,26 @@ function openEditModal(report) {
   document.getElementById('report-modal').classList.remove('hidden');
 
   setTimeout(() => {
+    const initLat = selectedLat || 23.6978;
+    const initLng = selectedLng || 120.9605;
+    const initZoom = selectedLat ? 15 : 8;
     if (!miniMapReady) {
-      miniMapMap = L.map('mini-map').setView([selectedLat || 23.69, selectedLng || 120.96], 13);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(miniMapMap);
+      miniMapMap = L.map('mini-map').setView([initLat, initLng], initZoom);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+      }).addTo(miniMapMap);
       miniMapMap.on('click', onMiniMapClick);
       miniMapReady = true;
     } else {
       miniMapMap.invalidateSize();
-      if (selectedLat) miniMapMap.setView([selectedLat, selectedLng], 13);
+      miniMapMap.setView([initLat, initLng], initZoom);
     }
     if (selectedLat) {
-      if (miniMapMarker) miniMapMap.removeLayer(miniMapMarker);
-      miniMapMarker = L.marker([selectedLat, selectedLng]).addTo(miniMapMap);
+      const savedAddr = selectedAddress; // preserve address from report
+      placeMapMarker(selectedLat, selectedLng);
+      selectedAddress = savedAddr;       // restore after placeMapMarker overwrites it
+      if (savedAddr) showLocationBadge(savedAddr);
     }
   }, 100);
 }
@@ -550,8 +554,6 @@ function resetReportForm() {
   keepImages = [];
   editingReportId = null;
   miniMapMarker = null;
-  addrMapMarker = null;
-  gpsMapMarker  = null;
 
   document.getElementById('species-input').value = '';
   document.getElementById('qty-input').value = '1';
@@ -564,39 +566,31 @@ function resetReportForm() {
   document.querySelector('.status-btn[data-status="alive"]').classList.add('active');
 
   document.getElementById('location-badge').classList.add('hidden');
-  document.getElementById('addr-result-map').classList.add('hidden');
-  document.getElementById('gps-result-map').classList.add('hidden');
-
-  switchTab('map');
 }
 
-// ── 定位 Tab ──────────────────────────────────────────────
-function switchTab(tab) {
-  activeTab = tab;
-  document.querySelectorAll('.tab-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.tab === tab);
-  });
-  document.getElementById('tab-map').classList.toggle('hidden', tab !== 'map');
-  document.getElementById('tab-address').classList.toggle('hidden', tab !== 'address');
-  document.getElementById('tab-gps').classList.toggle('hidden', tab !== 'gps');
-
-  if (tab === 'map' && miniMapReady) miniMapMap.invalidateSize();
-  if (tab === 'address' && addrMap)   addrMap.invalidateSize();
-  if (tab === 'gps'     && gpsMap)    gpsMap.invalidateSize();
-}
-
+// ── 統一定位地圖 ───────────────────────────────────────────
 function onMiniMapClick(e) {
   const { lat, lng } = e.latlng;
-  setLocationFromCoords(lat, lng, miniMapMap, (m) => { miniMapMarker = m; }, miniMapMarker);
+  placeMapMarker(lat, lng);
 }
 
-function setLocationFromCoords(lat, lng, map, setMarker, oldMarker) {
-  if (oldMarker) map.removeLayer(oldMarker);
-  const marker = L.marker([lat, lng]).addTo(map);
-  setMarker(marker);
+function placeMapMarker(lat, lng) {
+  if (miniMapMarker) miniMapMap.removeLayer(miniMapMarker);
+  miniMapMarker = L.marker([lat, lng], { draggable: true }).addTo(miniMapMap);
+  miniMapMarker.on('dragend', e => {
+    const pos = e.target.getLatLng();
+    selectedLat = pos.lat;
+    selectedLng = pos.lng;
+    selectedAddress = `${pos.lat.toFixed(6)}, ${pos.lng.toFixed(6)}`;
+    showLocationBadge('📡 解析中…');
+    reverseGeocode(pos.lat, pos.lng).then(addr => {
+      if (addr) selectedAddress = addr;
+      showLocationBadge(selectedAddress);
+    });
+  });
+
   selectedLat = lat;
   selectedLng = lng;
-  // 立即用座標當地址，避免送出時還殘留舊地址
   selectedAddress = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
   showLocationBadge('📡 解析中…');
 
@@ -606,7 +600,7 @@ function setLocationFromCoords(lat, lng, map, setMarker, oldMarker) {
   });
 }
 
-// Address search
+// Address search — pans the shared miniMapMap
 async function geocodeAddress() {
   const q = document.getElementById('addr-input').value.trim();
   if (!q) return;
@@ -615,29 +609,20 @@ async function geocodeAddress() {
   btn.textContent = '搜尋中…'; btn.disabled = true;
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&countrycodes=tw&accept-language=zh-TW`,
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&countrycodes=tw&accept-language=zh-TW`,
       { headers: { 'Accept-Language': 'zh-TW' } }
     );
     const data = await res.json();
-    if (!data.length) { showToast('找不到該地址', 'error'); return; }
+    if (!data.length) { showToast('找不到該地址，請嘗試更詳細的地址', 'error'); return; }
 
     const { lat, lon, display_name } = data[0];
-    selectedLat = parseFloat(lat);
-    selectedLng = parseFloat(lon);
-    selectedAddress = q;
+    const slat = parseFloat(lat);
+    const slng = parseFloat(lon);
 
-    // Show result map
-    const mapEl = document.getElementById('addr-result-map');
-    mapEl.classList.remove('hidden');
-    if (!addrMap) {
-      addrMap = L.map('addr-result-map').setView([selectedLat, selectedLng], 15);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(addrMap);
-    } else {
-      addrMap.setView([selectedLat, selectedLng], 15);
-      if (addrMapMarker) addrMap.removeLayer(addrMapMarker);
-    }
-    addrMapMarker = L.marker([selectedLat, selectedLng]).addTo(addrMap);
-    addrMap.invalidateSize();
+    miniMapMap.flyTo([slat, slng], 16, { animate: true, duration: 0.8 });
+    placeMapMarker(slat, slng);
+    // Override address with the search query for clarity
+    selectedAddress = display_name || q;
     showLocationBadge(q);
   } catch {
     showToast('搜尋失敗，請稍後再試', 'error');
@@ -646,37 +631,23 @@ async function geocodeAddress() {
   }
 }
 
-// GPS
+// GPS — pans the shared miniMapMap
 function getGPSLocation() {
   const btn = document.getElementById('gps-btn');
   if (!navigator.geolocation) { showToast('瀏覽器不支援定位', 'error'); return; }
-  btn.textContent = '📡 定位中…'; btn.disabled = true;
+  btn.textContent = '⏳'; btn.disabled = true;
 
   navigator.geolocation.getCurrentPosition(async pos => {
     const lat = pos.coords.latitude;
     const lng = pos.coords.longitude;
-    selectedLat = lat; selectedLng = lng;
 
-    const mapEl = document.getElementById('gps-result-map');
-    mapEl.classList.remove('hidden');
-    if (!gpsMap) {
-      gpsMap = L.map('gps-result-map').setView([lat, lng], 16);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(gpsMap);
-    } else {
-      gpsMap.setView([lat, lng], 16);
-      if (gpsMapMarker) gpsMap.removeLayer(gpsMapMarker);
-    }
-    gpsMapMarker = L.marker([lat, lng]).addTo(gpsMap);
-    gpsMap.invalidateSize();
+    miniMapMap.flyTo([lat, lng], 17, { animate: true, duration: 0.8 });
+    placeMapMarker(lat, lng);
 
-    const addr = await reverseGeocode(lat, lng);
-    selectedAddress = addr;
-    showLocationBadge(addr || `${lat.toFixed(5)}, ${lng.toFixed(5)}`);
-
-    btn.textContent = '📡 取得目前位置'; btn.disabled = false;
+    btn.textContent = '📡'; btn.disabled = false;
   }, err => {
     showToast('無法取得位置：' + err.message, 'error');
-    btn.textContent = '📡 取得目前位置'; btn.disabled = false;
+    btn.textContent = '📡'; btn.disabled = false;
   }, { enableHighAccuracy: true, timeout: 10000 });
 }
 

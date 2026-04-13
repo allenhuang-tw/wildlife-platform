@@ -112,34 +112,18 @@
       <!-- 地點 -->
       <section class="form-section">
         <h3><span class="sec-icon">📍</span> 通報地點</h3>
-        <div class="tab-btns">
-          <button class="tab-btn active" data-tab="map">地圖點選</button>
-          <button class="tab-btn" data-tab="address">輸入地址</button>
-          <button class="tab-btn" data-tab="gps">自動定位</button>
-        </div>
 
-        <!-- 地圖點選 -->
-        <div id="tab-map" class="tab-pane">
-          <p class="hint">在下方地圖點選通報位置</p>
-          <div id="mini-map"></div>
-        </div>
-
-        <!-- 輸入地址 -->
-        <div id="tab-address" class="tab-pane hidden">
+        <!-- 統一工具列：搜尋 + 定位 -->
+        <div class="loc-toolbar">
           <div class="addr-row">
-            <input id="addr-input" type="text" placeholder="請輸入地址或地名…" />
+            <input id="addr-input" type="text" placeholder="🔍 搜尋地址或地名…" />
             <button id="addr-search-btn" class="btn-secondary">搜尋</button>
           </div>
-          <div id="addr-result-map" class="addr-result-map hidden"></div>
+          <button id="gps-btn" class="btn-gps-sm" title="自動定位">📡</button>
         </div>
 
-        <!-- 自動定位 -->
-        <div id="tab-gps" class="tab-pane hidden">
-          <button id="gps-btn" class="btn-gps">
-            <span>📡</span> 取得目前位置
-          </button>
-          <div id="gps-result-map" class="addr-result-map hidden"></div>
-        </div>
+        <p class="hint">在地圖上點選位置，或使用上方搜尋／定位</p>
+        <div id="mini-map"></div>
 
         <div id="location-badge" class="location-badge hidden">
           <span class="badge-icon">✅</span>

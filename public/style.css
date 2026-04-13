@@ -413,15 +413,46 @@ header {
 }
 
 /* Mini map (inside modal) */
-#mini-map, .addr-result-map {
-  height: 200px;
+#mini-map {
+  height: 240px;
   border-radius: 8px;
   border: 1px solid var(--border);
   overflow: hidden;
 }
-.addr-result-map { margin-top: 8px; }
+.addr-result-map {
+  height: 200px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin-top: 8px;
+}
 
-/* GPS button */
+/* Unified location toolbar */
+.loc-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.loc-toolbar .addr-row { flex: 1; margin: 0; }
+
+/* GPS compact button */
+.btn-gps-sm {
+  flex-shrink: 0;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background .15s;
+  line-height: 1;
+}
+.btn-gps-sm:hover { background: var(--primary-light); }
+.btn-gps-sm:disabled { opacity: .6; cursor: not-allowed; }
+
+/* GPS button (kept for any legacy reference) */
 .btn-gps {
   display: flex;
   align-items: center;
@@ -858,7 +889,8 @@ button, input, select, textarea {
   .detail-meta     { grid-template-columns: 1fr 1fr; gap: 10px 12px; }
 
   /* Mini map 高度手機略調高 */
-  #mini-map, .addr-result-map { height: 180px; }
+  #mini-map { height: 200px; }
+  .addr-result-map { height: 180px; }
 
   /* Toast 不擋 FAB */
   .toast { bottom: calc(80px + env(safe-area-inset-bottom)); }
