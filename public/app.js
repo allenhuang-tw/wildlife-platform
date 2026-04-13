@@ -616,6 +616,7 @@ function placeMapMarker(lat, lng) {
 async function fetchSuggestions(q) {
   try {
     const res = await fetch(`/api/geocode/suggest?q=${encodeURIComponent(q)}`);
+    if (res.status === 429) { hideSuggestions(); return; }
     const data = await res.json();
     showSuggestions(data);
   } catch { hideSuggestions(); }

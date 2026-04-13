@@ -6,6 +6,7 @@ const axios   = require('axios');
 const path    = require('path');
 const crypto  = require('crypto');
 const cookieParser = require('cookie-parser');
+const rateLimit = require('express-rate-limit');
 const { createClient } = require('@supabase/supabase-js');
 
 const app  = express();
@@ -41,6 +42,36 @@ app.use(session({
   }
 }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ── Rate Limiting ─────────────────────────────────────────
+// 通用 API：每 IP 每分鐘 60 次
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: '請求過於頻繁，請稍後再試' }
+});
+
+// Geocoding（呼叫 Google API）：每 IP 每分鐘 20 次，每天 200 次
+const geocodeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: '地址搜尋請求過多，請稍後再試' }
+});
+
+const geocodeDailyLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: '今日地址搜尋次數已達上限' }
+});
+
+app.use('/api/geocode', geocodeDailyLimiter, geocodeLimiter);
+app.use('/api/', apiLimiter);
 
 // 從 session 或 signed cookie 取得使用者（防止 Render 多 instance session 遺失）
 const COOKIE_NAME = 'ww_user';
