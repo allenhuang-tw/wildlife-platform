@@ -518,25 +518,38 @@ app.get('/api/health', async (req, res) => {
   res.json(checks);
 });
 
-// ── 地址 Autocomplete 建議（Photon API）──────────────────────
+// ── 地址 Autocomplete 建議（Nominatim）───────────────────────
 app.get('/api/geocode/suggest', async (req, res) => {
   const q = (req.query.q || '').trim();
   if (q.length < 2) return res.json([]);
 
   try {
-    const r = await axios.get('https://photon.komoot.io/api/', {
-      params: { q, limit: 6, lang: 'zh', bbox: '118,21,122.5,26.5' },
-      timeout: 5000
+    const r = await axios.get('https://nominatim.openstreetmap.org/search', {
+      params: {
+        q,
+        format: 'json',
+        limit: 6,
+        countrycodes: 'tw',
+        'accept-language': 'zh-TW',
+        addressdetails: 1
+      },
+      headers: { 'User-Agent': 'WildlifePlatform/1.0', 'Accept-Language': 'zh-TW' },
+      timeout: 6000
     });
-    const results = (r.data.features || []).map(f => {
-      const p = f.properties;
-      const parts = [p.name, p.street, p.city || p.county, p.state].filter(Boolean);
+    const results = (r.data || []).map(d => {
+      const addr = d.address || {};
+      // 取有意義的短名稱
+      const name = addr.amenity || addr.tourism || addr.building ||
+                   addr.road || addr.suburb || addr.city_district ||
+                   d.display_name.split(',')[0];
+      const sub  = [addr.city || addr.county || addr.town || addr.village,
+                    addr.state].filter(Boolean).join(' · ');
       return {
-        lat: f.geometry.coordinates[1],
-        lng: f.geometry.coordinates[0],
-        name: p.name || parts[0] || '',
-        sub: [p.city || p.county, p.state].filter(Boolean).join(' · '),
-        display_name: parts.join('，')
+        lat: parseFloat(d.lat),
+        lng: parseFloat(d.lon),
+        name: name.trim(),
+        sub,
+        display_name: d.display_name
       };
     });
     res.json(results);
