@@ -621,6 +621,15 @@ async function fetchSuggestions(q) {
   } catch { hideSuggestions(); }
 }
 
+function positionSuggestions() {
+  const input = document.getElementById('addr-input');
+  const box   = document.getElementById('addr-suggestions');
+  const rect  = input.getBoundingClientRect();
+  box.style.top   = (rect.bottom + 4) + 'px';
+  box.style.left  = rect.left + 'px';
+  box.style.width = rect.width + 'px';
+}
+
 function showSuggestions(items) {
   const box = document.getElementById('addr-suggestions');
   if (!items.length) { hideSuggestions(); return; }
@@ -633,14 +642,15 @@ function showSuggestions(items) {
       ${item.sub ? `<span class="suggestion-sub">${item.sub}</span>` : ''}
     </div>
   `).join('');
+  positionSuggestions();
   box.classList.remove('hidden');
 
   box.querySelectorAll('.suggestion-item').forEach(el => {
     el.addEventListener('mousedown', e => {
       e.preventDefault(); // 防止 input blur 先觸發
-      const lat  = parseFloat(el.dataset.lat);
-      const lng  = parseFloat(el.dataset.lng);
-      const name = decodeURIComponent(el.dataset.name);
+      const lat     = parseFloat(el.dataset.lat);
+      const lng     = parseFloat(el.dataset.lng);
+      const name    = decodeURIComponent(el.dataset.name);
       const display = decodeURIComponent(el.dataset.display);
       document.getElementById('addr-input').value = name;
       hideSuggestions();

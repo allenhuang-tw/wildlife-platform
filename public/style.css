@@ -481,17 +481,15 @@ header {
 }
 .addr-input-wrap input:focus { border-color: var(--primary-light); }
 
-/* Autocomplete 下拉 */
+/* Autocomplete 下拉 — position:fixed 避免被 modal overflow 裁切 */
 .addr-suggestions {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0; right: 0;
+  position: fixed;
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 6px 20px rgba(0,0,0,.13);
-  z-index: 600;
-  max-height: 260px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.15);
+  z-index: 9000;
+  max-height: 240px;
   overflow-y: auto;
   overflow-x: hidden;
 }

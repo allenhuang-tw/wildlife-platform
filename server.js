@@ -528,12 +528,7 @@ app.get('/api/geocode/suggest', async (req, res) => {
       params: { q, limit: 6, lang: 'zh', bbox: '118,21,122.5,26.5' },
       timeout: 5000
     });
-    const features = (r.data.features || []).filter(f => {
-      const cc = (f.properties.countrycode || '').toUpperCase();
-      const cn = (f.properties.country || '');
-      return cc === 'TW' || cn.includes('台灣') || cn.includes('Taiwan');
-    });
-    const results = features.map(f => {
+    const results = (r.data.features || []).map(f => {
       const p = f.properties;
       const parts = [p.name, p.street, p.city || p.county, p.state].filter(Boolean);
       return {
