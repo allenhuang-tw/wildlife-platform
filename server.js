@@ -518,6 +518,51 @@ app.get('/api/health', async (req, res) => {
   res.json(checks);
 });
 
+// ── 地址 Geocoding 代理（NLSC → Nominatim fallback）────────
+app.get('/api/geocode', async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) return res.status(400).json({ error: 'missing q' });
+
+  // 1. 嘗試 NLSC（國土測繪中心）台灣地址定位服務
+  try {
+    const nlscRes = await axios.get(
+      'https://geocoding.nlsc.gov.tw/nlsc/toLonLat.action',
+      { params: { address: q, format: 'json' }, timeout: 6000 }
+    );
+    const d = nlscRes.data;
+    if (d && d.error === '0' && d.longitude && d.latitude) {
+      return res.json([{
+        lat: parseFloat(d.latitude),
+        lng: parseFloat(d.longitude),
+        display_name: d.address || q,
+        source: 'nlsc'
+      }]);
+    }
+  } catch (_) { /* fallthrough */ }
+
+  // 2. Fallback: Nominatim
+  try {
+    const nomRes = await axios.get(
+      'https://nominatim.openstreetmap.org/search',
+      {
+        params: { q, format: 'json', limit: 5, countrycodes: 'tw', 'accept-language': 'zh-TW' },
+        headers: { 'User-Agent': 'WildlifePlatform/1.0', 'Accept-Language': 'zh-TW' },
+        timeout: 8000
+      }
+    );
+    const results = (nomRes.data || []).map(d => ({
+      lat: parseFloat(d.lat),
+      lng: parseFloat(d.lon),
+      display_name: d.display_name,
+      source: 'nominatim'
+    }));
+    if (results.length) return res.json(results);
+    return res.json([]);
+  } catch (_) {
+    return res.status(502).json({ error: 'geocode failed' });
+  }
+});
+
 // ── 啟動 ─────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n🦌 野生動物通報平台已啟動 → http://localhost:${PORT}\n`);

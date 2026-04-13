@@ -600,7 +600,7 @@ function placeMapMarker(lat, lng) {
   });
 }
 
-// Address search — pans the shared miniMapMap
+// Address search — pans the shared miniMapMap (via server proxy: NLSC → Nominatim)
 async function geocodeAddress() {
   const q = document.getElementById('addr-input').value.trim();
   if (!q) return;
@@ -609,22 +609,16 @@ async function geocodeAddress() {
   const btn = document.getElementById('addr-search-btn');
   btn.textContent = '搜尋中…'; btn.disabled = true;
   try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&countrycodes=tw&accept-language=zh-TW`,
-      { headers: { 'Accept-Language': 'zh-TW' } }
-    );
+    const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
     const data = await res.json();
     if (!data.length) { showToast('找不到該地址，請嘗試更詳細的地址', 'error'); return; }
 
-    const { lat, lon, display_name } = data[0];
-    const slat = parseFloat(lat);
-    const slng = parseFloat(lon);
+    const { lat, lng, display_name } = data[0];
 
-    miniMapMap.flyTo([slat, slng], 16, { animate: true, duration: 0.8 });
-    placeMapMarker(slat, slng);
-    // Override address with the search query for clarity
+    miniMapMap.flyTo([lat, lng], 17, { animate: true, duration: 0.8 });
+    placeMapMarker(lat, lng);
     selectedAddress = display_name || q;
-    showLocationBadge(q);
+    showLocationBadge(display_name || q);
   } catch {
     showToast('搜尋失敗，請稍後再試', 'error');
   } finally {
