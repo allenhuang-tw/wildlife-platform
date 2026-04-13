@@ -518,6 +518,38 @@ app.get('/api/health', async (req, res) => {
   res.json(checks);
 });
 
+// ── 地址 Autocomplete 建議（Photon API）──────────────────────
+app.get('/api/geocode/suggest', async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (q.length < 2) return res.json([]);
+
+  try {
+    const r = await axios.get('https://photon.komoot.io/api/', {
+      params: { q, limit: 6, lang: 'zh', bbox: '118,21,122.5,26.5' },
+      timeout: 5000
+    });
+    const features = (r.data.features || []).filter(f => {
+      const cc = (f.properties.countrycode || '').toUpperCase();
+      const cn = (f.properties.country || '');
+      return cc === 'TW' || cn.includes('台灣') || cn.includes('Taiwan');
+    });
+    const results = features.map(f => {
+      const p = f.properties;
+      const parts = [p.name, p.street, p.city || p.county, p.state].filter(Boolean);
+      return {
+        lat: f.geometry.coordinates[1],
+        lng: f.geometry.coordinates[0],
+        name: p.name || parts[0] || '',
+        sub: [p.city || p.county, p.state].filter(Boolean).join(' · '),
+        display_name: parts.join('，')
+      };
+    });
+    res.json(results);
+  } catch {
+    res.json([]);
+  }
+});
+
 // ── 地址 Geocoding 代理（NLSC → Nominatim fallback）────────
 app.get('/api/geocode', async (req, res) => {
   const q = (req.query.q || '').trim();

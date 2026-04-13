@@ -366,8 +366,20 @@ function bindEvents() {
 
   // Address search
   document.getElementById('addr-search-btn').addEventListener('click', geocodeAddress);
+  // Autocomplete
+  let suggestTimer = null;
+  document.getElementById('addr-input').addEventListener('input', () => {
+    clearTimeout(suggestTimer);
+    const q = document.getElementById('addr-input').value.trim();
+    if (q.length < 2) { hideSuggestions(); return; }
+    suggestTimer = setTimeout(() => fetchSuggestions(q), 300);
+  });
   document.getElementById('addr-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') geocodeAddress();
+    if (e.key === 'Escape') { hideSuggestions(); return; }
+    if (e.key === 'Enter') { hideSuggestions(); geocodeAddress(); }
+  });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.addr-input-wrap')) hideSuggestions();
   });
 
   // GPS
@@ -598,6 +610,51 @@ function placeMapMarker(lat, lng) {
     if (addr) selectedAddress = addr;
     showLocationBadge(selectedAddress);
   });
+}
+
+// ── Autocomplete 下拉 ─────────────────────────────────────
+async function fetchSuggestions(q) {
+  try {
+    const res = await fetch(`/api/geocode/suggest?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    showSuggestions(data);
+  } catch { hideSuggestions(); }
+}
+
+function showSuggestions(items) {
+  const box = document.getElementById('addr-suggestions');
+  if (!items.length) { hideSuggestions(); return; }
+  box.innerHTML = items.map(item => `
+    <div class="suggestion-item"
+         data-lat="${item.lat}" data-lng="${item.lng}"
+         data-display="${encodeURIComponent(item.display_name)}"
+         data-name="${encodeURIComponent(item.name)}">
+      <span class="suggestion-name">${item.name || item.display_name}</span>
+      ${item.sub ? `<span class="suggestion-sub">${item.sub}</span>` : ''}
+    </div>
+  `).join('');
+  box.classList.remove('hidden');
+
+  box.querySelectorAll('.suggestion-item').forEach(el => {
+    el.addEventListener('mousedown', e => {
+      e.preventDefault(); // 防止 input blur 先觸發
+      const lat  = parseFloat(el.dataset.lat);
+      const lng  = parseFloat(el.dataset.lng);
+      const name = decodeURIComponent(el.dataset.name);
+      const display = decodeURIComponent(el.dataset.display);
+      document.getElementById('addr-input').value = name;
+      hideSuggestions();
+      if (!miniMapReady) return;
+      miniMapMap.flyTo([lat, lng], 17, { animate: true, duration: 0.8 });
+      placeMapMarker(lat, lng);
+      selectedAddress = display;
+      showLocationBadge(display);
+    });
+  });
+}
+
+function hideSuggestions() {
+  document.getElementById('addr-suggestions').classList.add('hidden');
 }
 
 // Address search — pans the shared miniMapMap (via server proxy: NLSC → Nominatim)

@@ -116,7 +116,10 @@
         <!-- 統一工具列：搜尋 + 定位 -->
         <div class="loc-toolbar">
           <div class="addr-row">
-            <input id="addr-input" type="text" placeholder="🔍 搜尋地址或地名…" />
+            <div class="addr-input-wrap">
+              <input id="addr-input" type="text" placeholder="🔍 搜尋地址或地名…" autocomplete="off" />
+              <div id="addr-suggestions" class="addr-suggestions hidden"></div>
+            </div>
             <button id="addr-search-btn" class="btn-secondary">搜尋</button>
           </div>
           <button id="gps-btn" class="btn-gps-sm" title="自動定位">📡</button>

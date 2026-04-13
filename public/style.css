@@ -469,16 +469,58 @@ header {
 .btn-gps:hover { background: var(--primary-light); }
 
 /* Address row */
-.addr-row { display: flex; gap: 8px; }
-.addr-row input {
-  flex: 1;
+.addr-row { display: flex; gap: 8px; flex: 1; }
+.addr-input-wrap { position: relative; flex: 1; }
+.addr-input-wrap input {
+  width: 100%;
   padding: 9px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 14px;
   outline: none;
 }
-.addr-row input:focus { border-color: var(--primary-light); }
+.addr-input-wrap input:focus { border-color: var(--primary-light); }
+
+/* Autocomplete 下拉 */
+.addr-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.13);
+  z-index: 600;
+  max-height: 260px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.suggestion-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background .12s;
+}
+.suggestion-item:last-child { border-bottom: none; }
+.suggestion-item:hover, .suggestion-item.active { background: #f0fdf4; }
+.suggestion-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.suggestion-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: block;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* Location badge */
 .location-badge {
