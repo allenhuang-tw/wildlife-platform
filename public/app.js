@@ -2,30 +2,33 @@
    野生動物通報平台 — 前端邏輯
    ═══════════════════════════════════════════════════════ */
 
-// ── 物種 Emoji 對照 ─────────────────────────────────────
-const SPECIES_EMOJI = {
-  '台灣黑熊':'🐻','黑熊':'🐻',
-  '石虎':'🐆',
-  '台灣獼猴':'🐒','獼猴':'🐒',
-  '山羌':'🦌','水鹿':'🦌','梅花鹿':'🦌',
-  '台灣野豬':'🐗','野豬':'🐗',
-  '白鼻心':'🦡','鼬獾':'🦡',
-  '飛鼠':'🦇','蝙蝠':'🦇',
-  '赤腹松鼠':'🐿️','松鼠':'🐿️',
-  '台灣藍鵲':'🦚','藍鵲':'🦚',
-  '領角鴞':'🦉','貓頭鷹':'🦉',
-  '鳳頭蒼鷹':'🦅','老鷹':'🦅','台灣黑鳶':'🦅',
-  '雨傘節':'🐍','龜殼花':'🐍','眼鏡蛇':'🐍','百步蛇':'🐍','蛇':'🐍',
-  '台灣草蜥':'🦎','蜥蜴':'🦎',
-  '草龜':'🐢','斑龜':'🐢','龜':'🐢',
-  '緬甸蟒':'🐍','蟒':'🐍',
+// ── 分類預設 Emoji ───────────────────────────────────────
+const CATEGORY_EMOJI = {
+  '哺乳類':'🦌','鳥類':'🦅','爬蟲類':'🦎',
+  '兩棲類':'🐸','昆蟲類':'🦋','魚類':'🐟','其他':'🐾'
 };
-function getEmoji(species) {
-  for (const [k, v] of Object.entries(SPECIES_EMOJI)) {
-    if (species.includes(k)) return v;
+const SPECIES_EMOJI_MAP = {
+  '台灣黑熊':'🐻','黑熊':'🐻','石虎':'🐆','獼猴':'🐒',
+  '山羌':'🦌','水鹿':'🦌','梅花鹿':'🦌','野豬':'🐗',
+  '白鼻心':'🦡','鼬獾':'🦡','飛鼠':'🦇','蝙蝠':'🦇',
+  '松鼠':'🐿️','藍鵲':'🦚','領角鴞':'🦉','貓頭鷹':'🦉',
+  '蒼鷹':'🦅','老鷹':'🦅','黑鳶':'🦅','鴞':'🦉',
+  '蛇':'🐍','龜':'🐢','蜥':'🦎','蟒':'🐍','青蛙':'🐸',
+  '蟾蜍':'🐸','樹蛙':'🐸','魚':'🐟','昆蟲':'🦋',
+  '蝴蝶':'🦋','甲蟲':'🪲','穿山甲':'🦔',
+};
+function getEmoji(species, category) {
+  if (category && CATEGORY_EMOJI[category]) return CATEGORY_EMOJI[category];
+  for (const [k, v] of Object.entries(SPECIES_EMOJI_MAP)) {
+    if (species && species.includes(k)) return v;
   }
   return '🦎';
 }
+
+// ── 物種選擇器狀態 ───────────────────────────────────────
+let selectedSpecies  = null;  // { id, name_zh, name_en, category, icon }
+let selectedCategory = '';
+let speciesCache     = {};    // category → array
 
 const STATUS_LABELS = { alive:'存活', injured:'受傷', dead:'死亡', unknown:'不確定' };
 const STATUS_COLORS = { alive:'#22c55e', injured:'#f97316', dead:'#ef4444', unknown:'#94a3b8' };
@@ -385,6 +388,9 @@ function bindEvents() {
   // GPS
   document.getElementById('gps-btn').addEventListener('click', getGPSLocation);
 
+  // 物種選擇器
+  initSpeciesSelector();
+
   // Status buttons
   document.querySelectorAll('.status-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -443,6 +449,115 @@ function bindEvents() {
   });
 }
 
+// ── 物種選擇器 ───────────────────────────────────────────
+function initSpeciesSelector() {
+  document.querySelectorAll('.category-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedCategory = btn.dataset.cat;
+      selectedSpecies  = null;
+      document.getElementById('species-selected').classList.add('hidden');
+      document.getElementById('species-search').value = '';
+      document.getElementById('species-field').classList.remove('hidden');
+      loadSpeciesByCategory(selectedCategory);
+    });
+  });
+
+  document.getElementById('species-search').addEventListener('input', () => {
+    const q = document.getElementById('species-search').value.trim();
+    const list = speciesCache[selectedCategory] || [];
+    const filtered = q
+      ? list.filter(s => s.name_zh.includes(q) || (s.name_en || '').toLowerCase().includes(q.toLowerCase()))
+      : list;
+    renderSpeciesDropdown(filtered);
+  });
+
+  document.getElementById('species-search').addEventListener('focus', () => {
+    const list = speciesCache[selectedCategory] || [];
+    if (list.length) renderSpeciesDropdown(list);
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.species-select-wrap')) {
+      document.getElementById('species-dropdown').classList.add('hidden');
+    }
+  });
+}
+
+async function loadSpeciesByCategory(cat) {
+  const searchEl   = document.getElementById('species-search');
+  searchEl.placeholder = '載入中…'; searchEl.disabled = true;
+
+  if (!speciesCache[cat]) {
+    try {
+      const res = await fetch(`/api/species?category=${encodeURIComponent(cat)}`);
+      speciesCache[cat] = await res.json();
+    } catch { speciesCache[cat] = []; }
+  }
+
+  searchEl.placeholder = '輸入關鍵字搜尋…'; searchEl.disabled = false;
+  searchEl.focus();
+  renderSpeciesDropdown(speciesCache[cat]);
+}
+
+function renderSpeciesDropdown(items) {
+  const box = document.getElementById('species-dropdown');
+  if (!items.length) {
+    box.innerHTML = '<div class="species-option" style="color:var(--text-muted)">找不到符合物種</div>';
+  } else {
+    box.innerHTML = items.map(s => `
+      <div class="species-option" data-id="${s.id}" data-name="${encodeURIComponent(s.name_zh)}"
+           data-en="${encodeURIComponent(s.name_en||'')}" data-cat="${encodeURIComponent(s.category)}"
+           data-icon="${encodeURIComponent(s.icon||'')}">
+        <span class="species-option-icon">${s.icon || CATEGORY_EMOJI[s.category] || '🦎'}</span>
+        <span class="species-option-name">${s.name_zh}</span>
+        ${s.name_en ? `<span class="species-option-en">${s.name_en}</span>` : ''}
+      </div>
+    `).join('');
+  }
+
+  // position:fixed 避免被 modal overflow 裁切
+  const input = document.getElementById('species-search');
+  const rect  = input.getBoundingClientRect();
+  box.style.top   = (rect.bottom + 3) + 'px';
+  box.style.left  = rect.left + 'px';
+  box.style.width = rect.width + 'px';
+  box.classList.remove('hidden');
+
+  box.querySelectorAll('.species-option[data-id]').forEach(el => {
+    el.addEventListener('mousedown', e => {
+      e.preventDefault();
+      selectSpecies({
+        id:       el.dataset.id,
+        name_zh:  decodeURIComponent(el.dataset.name),
+        name_en:  decodeURIComponent(el.dataset.en),
+        category: decodeURIComponent(el.dataset.cat),
+        icon:     decodeURIComponent(el.dataset.icon)
+      });
+    });
+  });
+}
+
+function selectSpecies(sp) {
+  selectedSpecies = sp;
+  document.getElementById('species-search').value = '';
+  document.getElementById('species-dropdown').classList.add('hidden');
+
+  const tag = document.getElementById('species-selected');
+  tag.innerHTML = `${sp.icon || CATEGORY_EMOJI[sp.category] || '🦎'} ${sp.name_zh}
+    <button type="button" id="species-clear-btn">✕</button>`;
+  tag.classList.remove('hidden');
+  document.getElementById('species-clear-btn').addEventListener('click', clearSpeciesSelection);
+}
+
+function clearSpeciesSelection() {
+  selectedSpecies = null;
+  document.getElementById('species-selected').classList.add('hidden');
+  document.getElementById('species-search').value = '';
+  document.getElementById('species-search').focus();
+}
+
 // ── 通報 Modal ────────────────────────────────────────────
 function openReportModal() {
   resetReportForm();
@@ -478,7 +593,16 @@ function openEditModal(report) {
   editingReportId = report.id;
 
   // 預填欄位
-  document.getElementById('species-input').value = report.species || '';
+  // 編輯模式：從 DB 撈物種資料預填
+  if (report.species) {
+    selectedSpecies = { name_zh: report.species, icon: getEmoji(report.species), category: '' };
+    const tag = document.getElementById('species-selected');
+    tag.innerHTML = `${getEmoji(report.species)} ${report.species}
+      <button type="button" id="species-clear-btn">✕</button>`;
+    tag.classList.remove('hidden');
+    document.getElementById('species-field').classList.remove('hidden');
+    document.getElementById('species-clear-btn').addEventListener('click', clearSpeciesSelection);
+  }
   document.getElementById('qty-input').value      = report.quantity || 1;
   document.getElementById('desc-input').value     = report.description || '';
 
@@ -567,12 +691,21 @@ function resetReportForm() {
   editingReportId = null;
   miniMapMarker = null;
 
-  document.getElementById('species-input').value = '';
+  selectedSpecies  = null;
+  selectedCategory = '';
+
   document.getElementById('qty-input').value = '1';
   document.getElementById('desc-input').value = '';
   document.getElementById('addr-input').value = '';
   document.getElementById('photo-preview').innerHTML = '';
   document.getElementById('upload-placeholder').style.display = '';
+
+  // 物種選擇器重置
+  document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('species-field').classList.add('hidden');
+  document.getElementById('species-selected').classList.add('hidden');
+  document.getElementById('species-dropdown').classList.add('hidden');
+  if (document.getElementById('species-search')) document.getElementById('species-search').value = '';
 
   document.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active'));
   document.querySelector('.status-btn[data-status="alive"]').classList.add('active');
@@ -875,11 +1008,11 @@ function renderPhotoPreview() {
 async function submitReport() {
   if (!currentUser) { showLoginPrompt(); return; }
 
-  const species = document.getElementById('species-input').value.trim();
+  const species = selectedSpecies ? selectedSpecies.name_zh : '';
   const qty     = document.getElementById('qty-input').value;
   const desc    = document.getElementById('desc-input').value.trim();
 
-  if (!species) { showToast('請填寫物種名稱', 'error'); return; }
+  if (!species) { showToast('請選擇物種', 'error'); return; }
   if (selectedLat === null || selectedLng === null) {
     showToast('請選擇通報地點', 'error'); return;
   }

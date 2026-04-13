@@ -137,21 +137,32 @@
       <!-- 物種 -->
       <section class="form-section">
         <h3><span class="sec-icon">🦎</span> 物種資訊</h3>
-        <div class="form-row two-col">
-          <div class="field">
-            <label>物種名稱 <em>*</em></label>
-            <input id="species-input" type="text" placeholder="如：台灣黑熊、石虎…" list="species-list" />
-            <datalist id="species-list">
-              <option value="台灣黑熊"><option value="石虎"><option value="台灣獼猴">
-              <option value="山羌"><option value="水鹿"><option value="梅花鹿">
-              <option value="台灣野豬"><option value="白鼻心"><option value="鼬獾">
-              <option value="麝香貓"><option value="飛鼠"><option value="赤腹松鼠">
-              <option value="台灣藍鵲"><option value="領角鴞"><option value="鳳頭蒼鷹">
-              <option value="台灣黑鳶"><option value="台灣草蜥"><option value="雨傘節">
-              <option value="龜殼花"><option value="眼鏡蛇"><option value="百步蛇">
-              <option value="緬甸蟒"><option value="草龜"><option value="斑龜">
-            </datalist>
+
+        <!-- 分類選擇 -->
+        <div class="field">
+          <label>物種分類 <em>*</em></label>
+          <div class="category-btns" id="category-btns">
+            <button type="button" class="category-btn" data-cat="哺乳類">🦌 哺乳類</button>
+            <button type="button" class="category-btn" data-cat="鳥類">🦅 鳥類</button>
+            <button type="button" class="category-btn" data-cat="爬蟲類">🦎 爬蟲類</button>
+            <button type="button" class="category-btn" data-cat="兩棲類">🐸 兩棲類</button>
+            <button type="button" class="category-btn" data-cat="昆蟲類">🦋 昆蟲類</button>
+            <button type="button" class="category-btn" data-cat="魚類">🐟 魚類</button>
+            <button type="button" class="category-btn" data-cat="其他">🐾 其他</button>
           </div>
+        </div>
+
+        <!-- 物種搜尋選擇（選完分類後出現） -->
+        <div class="field hidden" id="species-field">
+          <label>物種名稱 <em>*</em></label>
+          <div class="species-select-wrap">
+            <input id="species-search" type="text" placeholder="輸入關鍵字搜尋…" autocomplete="off" />
+            <div id="species-dropdown" class="species-dropdown hidden"></div>
+          </div>
+          <div id="species-selected" class="species-selected-tag hidden"></div>
+        </div>
+
+        <div class="form-row two-col">
           <div class="field">
             <label>數量</label>
             <input id="qty-input" type="number" value="1" min="1" max="9999" />

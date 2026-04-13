@@ -549,6 +549,16 @@ app.get('/api/health', async (req, res) => {
   res.json(checks);
 });
 
+// ── 物種清單 ──────────────────────────────────────────────
+app.get('/api/species', async (req, res) => {
+  const cat = req.query.category || '';
+  let query = supabase.from('species').select('id,name_zh,name_en,category,icon').order('category').order('name_zh');
+  if (cat) query = query.eq('category', cat);
+  const { data, error } = await query;
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
 // ── 地址 Autocomplete 建議（Google Places Autocomplete）──────
 app.get('/api/geocode/suggest', async (req, res) => {
   const q = (req.query.q || '').trim();
