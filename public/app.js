@@ -604,6 +604,7 @@ function placeMapMarker(lat, lng) {
 async function geocodeAddress() {
   const q = document.getElementById('addr-input').value.trim();
   if (!q) return;
+  if (!miniMapReady) { showToast('地圖載入中，請稍候再試', 'error'); return; }
 
   const btn = document.getElementById('addr-search-btn');
   btn.textContent = '搜尋中…'; btn.disabled = true;
@@ -635,6 +636,7 @@ async function geocodeAddress() {
 function getGPSLocation() {
   const btn = document.getElementById('gps-btn');
   if (!navigator.geolocation) { showToast('瀏覽器不支援定位', 'error'); return; }
+  if (!miniMapReady) { showToast('地圖載入中，請稍候再試', 'error'); return; }
   btn.textContent = '⏳'; btn.disabled = true;
 
   navigator.geolocation.getCurrentPosition(async pos => {

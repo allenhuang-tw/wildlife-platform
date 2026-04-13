@@ -1,4 +1,4 @@
-const CACHE = 'wildlife-v2';
+const CACHE = 'wildlife-v3';
 const STATIC = [
   '/',
   '/style.css',
