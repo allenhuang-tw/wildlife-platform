@@ -559,17 +559,39 @@ app.get('/api/geocode/suggest', async (req, res) => {
 });
 
 // ── 地址 Geocoding 代理（NLSC → Nominatim fallback）────────
+
+// 台灣地址解析：拆出路名+號碼、區、縣市，方便 Nominatim 結構化查詢
+function parseTwAddress(q) {
+  const norm = q.replace(/臺/g, '台').replace(/　/g, ' ').trim();
+  const cityM  = norm.match(/^(台[北中南東西]市|新北市|桃園市|基隆市|新竹[市縣]|苗栗縣|台中市|彰化縣|南投縣|雲林縣|嘉義[市縣]|台南市|高雄市|屏東縣|宜蘭縣|花蓮縣|台東縣|澎湖縣|金門縣|連江縣)/);
+  const distM  = norm.match(/[市縣]([^路街大道巷弄號\d]+[區鄉鎮市])/);
+  const roadM  = norm.match(/[區鄉鎮市](.+?[路街大道])/);
+  const secM   = norm.match(/[路街道](.{0,4}段)/);
+  const numM   = norm.match(/(\d+)\s*號/);
+  return {
+    city: cityM  ? cityM[1]  : '',
+    dist: distM  ? distM[1]  : '',
+    road: roadM  ? roadM[1]  : '',
+    sec:  secM   ? secM[1]   : '',
+    num:  numM   ? numM[1]   : '',
+    norm
+  };
+}
+
 app.get('/api/geocode', async (req, res) => {
   const q = (req.query.q || '').trim();
   if (!q) return res.status(400).json({ error: 'missing q' });
+
+  const norm = q.replace(/臺/g, '台');
 
   // 1. 嘗試 NLSC（國土測繪中心）台灣地址定位服務
   try {
     const nlscRes = await axios.get(
       'https://geocoding.nlsc.gov.tw/nlsc/toLonLat.action',
-      { params: { address: q, format: 'json' }, timeout: 6000 }
+      { params: { address: norm, format: 'json' }, timeout: 6000 }
     );
     const d = nlscRes.data;
+    console.log('[NLSC]', norm, '→', JSON.stringify(d));
     if (d && d.error === '0' && d.longitude && d.latitude) {
       return res.json([{
         lat: parseFloat(d.latitude),
@@ -578,29 +600,49 @@ app.get('/api/geocode', async (req, res) => {
         source: 'nlsc'
       }]);
     }
-  } catch (_) { /* fallthrough */ }
-
-  // 2. Fallback: Nominatim
-  try {
-    const nomRes = await axios.get(
-      'https://nominatim.openstreetmap.org/search',
-      {
-        params: { q, format: 'json', limit: 5, countrycodes: 'tw', 'accept-language': 'zh-TW' },
-        headers: { 'User-Agent': 'WildlifePlatform/1.0', 'Accept-Language': 'zh-TW' },
-        timeout: 8000
-      }
-    );
-    const results = (nomRes.data || []).map(d => ({
-      lat: parseFloat(d.lat),
-      lng: parseFloat(d.lon),
-      display_name: d.display_name,
-      source: 'nominatim'
-    }));
-    if (results.length) return res.json(results);
-    return res.json([]);
-  } catch (_) {
-    return res.status(502).json({ error: 'geocode failed' });
+  } catch (e) {
+    console.log('[NLSC error]', e.message);
   }
+
+  // 2. Nominatim — 先用原始查詢，失敗再用拆解後的結構化查詢
+  const parsed = parseTwAddress(q);
+  // 結構化查詢：路+號, 區, 市
+  const structured = [
+    parsed.road + (parsed.sec || '') + (parsed.num ? ' ' + parsed.num : ''),
+    parsed.dist,
+    parsed.city
+  ].filter(Boolean).join(', ');
+
+  const queries = [norm];
+  if (structured && structured !== norm) queries.push(structured);
+  // 最後備案：只搜路名（精確度低但至少找得到）
+  if (parsed.road) queries.push(parsed.road + (parsed.sec || '') + ', ' + (parsed.city || '台灣'));
+
+  for (const qStr of queries) {
+    try {
+      const nomRes = await axios.get(
+        'https://nominatim.openstreetmap.org/search',
+        {
+          params: { q: qStr, format: 'json', limit: 3, countrycodes: 'tw', 'accept-language': 'zh-TW' },
+          headers: { 'User-Agent': 'WildlifePlatform/1.0' },
+          timeout: 6000
+        }
+      );
+      console.log('[Nominatim]', qStr, '→', nomRes.data?.length, '筆');
+      if (nomRes.data?.length) {
+        return res.json(nomRes.data.map(d => ({
+          lat: parseFloat(d.lat),
+          lng: parseFloat(d.lon),
+          display_name: d.display_name,
+          source: 'nominatim'
+        })));
+      }
+    } catch (e) {
+      console.log('[Nominatim error]', e.message);
+    }
+  }
+
+  return res.json([]);
 });
 
 // ── 啟動 ─────────────────────────────────────────────────
