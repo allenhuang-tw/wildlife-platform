@@ -194,7 +194,7 @@ function renderAuthUI(isAdmin = false) {
 function initMainMap() {
   mainMap = L.map('map', { zoomControl: true }).setView([23.6978, 120.9605], 8);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org">OpenStreetMap</a>',
+    attribution: '© <a href="https://carto.com">CARTO</a> © <a href="https://www.openstreetmap.org">OpenStreetMap</a>',
     maxZoom: 19
   }).addTo(mainMap);
   markersLayer = L.layerGroup().addTo(mainMap);
@@ -454,9 +454,9 @@ function openReportModal() {
   setTimeout(() => {
     if (!miniMapReady) {
       miniMapMap = L.map('mini-map').setView([23.6978, 120.9605], 8);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         maxZoom: 19,
-        attribution: '© OpenStreetMap'
+        attribution: '© CARTO © OpenStreetMap'
       }).addTo(miniMapMap);
       miniMapMap.on('click', onMiniMapClick);
       miniMapReady = true;
@@ -515,9 +515,9 @@ function openEditModal(report) {
     const initZoom = selectedLat ? 15 : 8;
     if (!miniMapReady) {
       miniMapMap = L.map('mini-map').setView([initLat, initLng], initZoom);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         maxZoom: 19,
-        attribution: '© OpenStreetMap'
+        attribution: '© CARTO © OpenStreetMap'
       }).addTo(miniMapMap);
       miniMapMap.on('click', onMiniMapClick);
       miniMapReady = true;
@@ -719,6 +719,8 @@ async function geocodeAddress() {
 }
 
 // GPS — pans the shared miniMapMap
+let gpsAccuracyCircle = null;
+
 function getGPSLocation() {
   const btn = document.getElementById('gps-btn');
   if (!navigator.geolocation) { showToast('瀏覽器不支援定位', 'error'); return; }
@@ -726,11 +728,25 @@ function getGPSLocation() {
   btn.textContent = '⏳'; btn.disabled = true;
 
   navigator.geolocation.getCurrentPosition(async pos => {
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
+    const lat      = pos.coords.latitude;
+    const lng      = pos.coords.longitude;
+    const accuracy = pos.coords.accuracy; // 公尺
 
     miniMapMap.flyTo([lat, lng], 17, { animate: true, duration: 0.8 });
     placeMapMarker(lat, lng);
+
+    // 顯示精準度圓圈
+    if (gpsAccuracyCircle) miniMapMap.removeLayer(gpsAccuracyCircle);
+    gpsAccuracyCircle = L.circle([lat, lng], {
+      radius: accuracy,
+      color: '#2d6a4f', fillColor: '#52b788',
+      fillOpacity: 0.15, weight: 1
+    }).addTo(miniMapMap);
+
+    const accText = accuracy < 50 ? `精準（±${Math.round(accuracy)}m）`
+                  : accuracy < 150 ? `普通（±${Math.round(accuracy)}m）`
+                  : `較差（±${Math.round(accuracy)}m），建議手動微調 pin 位置`;
+    showToast(`GPS ${accText}`, accuracy < 150 ? 'success' : 'warning');
 
     btn.textContent = '📡'; btn.disabled = false;
   }, err => {

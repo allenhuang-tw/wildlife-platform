@@ -767,6 +767,7 @@ textarea { resize: vertical; width: 100%; }
 }
 .toast.success { background: var(--primary); }
 .toast.error   { background: var(--dead); }
+.toast.warning { background: #d97706; }
 
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateX(-50%) translateY(10px); }
