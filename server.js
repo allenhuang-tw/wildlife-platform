@@ -641,6 +641,41 @@ app.get('/api/geocode', async (req, res) => {
   return res.json([]);
 });
 
+// ── 反向定位（座標 → 地址）Google Geocoding ───────────────
+app.get('/api/reverse-geocode', geocodeDailyLimiter, geocodeLimiter, async (req, res) => {
+  const lat  = parseFloat(req.query.lat);
+  const lng  = parseFloat(req.query.lng);
+  if (isNaN(lat) || isNaN(lng)) return res.status(400).json({ error: 'invalid coords' });
+
+  const GKEY = process.env.GOOGLE_GEOCODE_KEY;
+  if (GKEY) {
+    try {
+      const r = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
+        params: { latlng: `${lat},${lng}`, language: 'zh-TW', key: GKEY },
+        timeout: 6000
+      });
+      const result = r.data.results?.[0];
+      if (result) {
+        // 去掉郵遞區號和「台灣/臺灣」後綴
+        const addr = result.formatted_address
+          .replace(/^\d{5}/, '').replace(/,?\s*(台灣|臺灣)$/, '').trim();
+        return res.json({ address: addr });
+      }
+    } catch (e) { console.log('[Google Reverse error]', e.message); }
+  }
+
+  // Fallback: Nominatim
+  try {
+    const r = await axios.get(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=zh-TW`,
+      { headers: { 'User-Agent': 'WildlifePlatform/1.0' }, timeout: 6000 }
+    );
+    return res.json({ address: r.data.display_name || '' });
+  } catch (_) {}
+
+  res.json({ address: '' });
+});
+
 // ── 啟動 ─────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n🦌 野生動物通報平台已啟動 → http://localhost:${PORT}\n`);

@@ -747,11 +747,9 @@ function showLocationBadge(text) {
 
 async function reverseGeocode(lat, lng) {
   try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=zh-TW`
-    );
+    const res  = await fetch(`/api/reverse-geocode?lat=${lat}&lng=${lng}`);
     const data = await res.json();
-    return data.display_name || '';
+    return data.address || '';
   } catch { return ''; }
 }
 
